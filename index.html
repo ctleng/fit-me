@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -16,8 +17,9 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        window.firebaseApp = { initializeApp, getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously, getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy };
+        import { getFirestore, initializeFirestore, memoryLocalCache, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        window.firebaseApp = { initializeApp, getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously, getFirestore, initializeFirestore, memoryLocalCache, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy };
     </script>
 
     <style>
@@ -39,13 +41,13 @@
         // [중요] 여기에 본인의 Firebase 키를 입력하세요!
         // ===========================================================
         const myFirebaseConfig = {
-  apiKey: "AIzaSyA7aW0QCktGF8qBmLaaMuHXfr8gNkEOvO8",
-  authDomain: "fitme-89d4d.firebaseapp.com",
-  projectId: "fitme-89d4d",
-  storageBucket: "fitme-89d4d.firebasestorage.app",
-  messagingSenderId: "512104272869",
-  appId: "1:512104272869:web:ef13a0168f299904d4d50c",
-  measurementId: "G-MDVJ39NKBV"
+  apiKey: "AIzaSyA7aW0QCktGF8qBmLaaMuHXfr8gNkEOvO8",
+  authDomain: "fitme-89d4d.firebaseapp.com",
+  projectId: "fitme-89d4d",
+  storageBucket: "fitme-89d4d.firebasestorage.app",
+  messagingSenderId: "512104272869",
+  appId: "1:512104272869:web:ef13a0168f299904d4d50c",
+  measurementId: "G-MDVJ39NKBV"
         };
         // ===========================================================
 
@@ -110,10 +112,11 @@
                 }
             }
 
-            const { initializeApp, getAuth, getFirestore } = window.firebaseApp;
+            const { initializeApp, getAuth, getFirestore, initializeFirestore, memoryLocalCache } = window.firebaseApp;
             app = initializeApp(configToUse);
             auth = getAuth(app);
-            db = getFirestore(app);
+            // [수정] 충돌 방지를 위해 메모리 캐시 모드로 초기화
+            db = initializeFirestore(app, { localCache: memoryLocalCache() });
             appId = configToUse.projectId || 'default-app';
         } catch (e) {
             console.error("Firebase Init Error:", e);
@@ -167,27 +170,66 @@
         );
 
         const OnboardingPage = ({ onSave }) => {
-            const [form, setForm] = useState({ nickname: '', weight: '', muscle: '', age: '', gender: 'male' });
+            const [form, setForm] = useState({ nickname: '', weight: '', height: '', muscle: '', age: '', gender: 'male', activityLevel: 'moderate' });
             const handleSubmit = () => {
-                if (!form.nickname || !form.weight) return alert('닉네임과 체중은 필수입니다.');
+                if (!form.nickname || !form.weight || !form.height) return alert('닉네임, 키, 체중은 필수입니다.');
                 onSave(form);
             };
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center bg-blue-600 p-6 animate-fade-in text-white">
                     <div className="w-full max-w-sm text-center">
                         <h1 className="text-3xl font-bold mb-2">환영합니다! 👋</h1>
-                        <p className="mb-6 text-blue-100">더 정확한 분석을 위해 정보를 알려주세요.</p>
+                        <p className="mb-6 text-blue-100">정확한 분석을 위해 정보를 알려주세요.</p>
+                        
                         <div className="bg-white rounded-2xl p-6 text-gray-800 shadow-lg text-left space-y-4 max-h-[80vh] overflow-y-auto">
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">닉네임 *</label><input type="text" className="w-full p-3 border rounded-lg bg-gray-50" value={form.nickname} onChange={e => setForm({...form, nickname: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">현재 체중 (kg) *</label><input type="number" className="w-full p-3 border rounded-lg bg-gray-50" value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} /></div>
-                            <div className="pt-4 border-t border-gray-100"><p className="text-xs text-blue-600 font-bold mb-3 flex items-center"><Icon name="info" size={12} className="mr-1"/> 추가 정보 (선택)</p>
-                                <div className="grid grid-cols-2 gap-3 mb-3">
-                                    <div><label className="block text-xs font-bold text-gray-500 mb-1">나이</label><input type="number" className="w-full p-3 border rounded-lg bg-gray-50" value={form.age} onChange={e => setForm({...form, age: e.target.value})} /></div>
-                                    <div><label className="block text-xs font-bold text-gray-500 mb-1">성별</label><select className="w-full p-3 border rounded-lg bg-gray-50" value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}><option value="male">남성</option><option value="female">여성</option></select></div>
-                                </div>
-                                <div><label className="block text-xs font-bold text-gray-500 mb-1">골격근량 (kg)</label><input type="number" className="w-full p-3 border rounded-lg bg-gray-50" value={form.muscle} onChange={e => setForm({...form, muscle: e.target.value})} /></div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">닉네임 <span className="text-red-500">*</span></label>
+                                <input type="text" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 헬린이" value={form.nickname} onChange={e => setForm({...form, nickname: e.target.value})} />
                             </div>
-                            <button onClick={handleSubmit} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-4">시작하기</button>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">키 (cm) <span className="text-red-500">*</span></label>
+                                    <input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 175" value={form.height} onChange={e => setForm({...form, height: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">체중 (kg) <span className="text-red-500">*</span></label>
+                                    <input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 70" value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">평소 활동량 <span className="text-red-500">*</span></label>
+                                <select className="w-full p-3 border rounded-lg bg-gray-50" value={form.activityLevel} onChange={e => setForm({...form, activityLevel: e.target.value})}>
+                                    <option value="sedentary">비활동적 (운동 안 함)</option>
+                                    <option value="light">약간 활동적 (주 1-3회)</option>
+                                    <option value="moderate">보통 활동적 (주 3-5회)</option>
+                                    <option value="active">매우 활동적 (주 6-7회)</option>
+                                    <option value="very_active">초고강도 (육체 노동 등)</option>
+                                </select>
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-100">
+                                <p className="text-xs text-blue-600 font-bold mb-3 flex items-center"><Icon name="info" size={12} className="mr-1"/> 추가 정보 (선택)</p>
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">나이</label>
+                                        <input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 30" value={form.age} onChange={e => setForm({...form, age: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">성별</label>
+                                        <select className="w-full p-3 border rounded-lg bg-gray-50" value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}>
+                                            <option value="male">남성</option>
+                                            <option value="female">여성</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">골격근량 (kg)</label>
+                                    <input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="인바디 수치" value={form.muscle} onChange={e => setForm({...form, muscle: e.target.value})} />
+                                </div>
+                            </div>
+
+                            <button onClick={handleSubmit} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-4 hover:bg-blue-700 transition-colors">시작하기</button>
                         </div>
                     </div>
                 </div>
@@ -213,7 +255,7 @@
                         const d = logs[date];
                         return `[${date}] 운동:${d.exercises?.map(e => `${e.name}(${e.kcal || 0}kcal)`).join(', ') || '없음'}, 식단:${d.diet?.length || 0}끼`;
                     }).join('\n');
-                    const userProfile = `사용자정보: 체중 ${profile.weight}kg, 골격근 ${profile.muscle}kg`;
+                    const userProfile = `사용자정보: 체중 ${profile.weight}kg, 키 ${profile.height}cm, 골격근 ${profile.muscle}kg, 활동량 ${profile.activityLevel}`;
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts: [{ text: userMsg }] }], systemInstruction: { parts: [{ text: `헬스 트레이너입니다. ${userProfile} 참고. 최근기록: ${contextData}` }] } })
@@ -279,7 +321,7 @@
         };
 
         const HealthTrackerApp = () => {
-            const { initializeApp, getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously, getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy } = window.firebaseApp;
+            const { initializeApp, getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously, getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, initializeFirestore, memoryLocalCache } = window.firebaseApp;
             const [user, setUser] = useState(null);
             const [profile, setProfile] = useState(null);
             const [activeTab, setActiveTab] = useState('calendar');
@@ -659,14 +701,9 @@
                                                     {ex.type === 'strength' ? <Icon name="dumbbell" size={16} /> : <span className="text-sm">🏃</span>}
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold text-gray-800 flex items-center">
-                                                        {ex.name} 
-                                                        {ex.weight && <span className="ml-1 text-xs font-normal text-gray-500">({ex.weight}kg)</span>}
-                                                    </div>
+                                                    <div className="font-bold text-gray-800 flex items-center">{ex.name} {ex.weight && <span className="ml-1 text-xs font-normal text-gray-500">({ex.weight}kg)</span>}</div>
                                                     <div className="text-xs text-gray-500 font-medium">
-                                                        {ex.type === 'strength' 
-                                                            ? (ex.duration ? `${ex.duration}초 × ${ex.sets}세트` : `${ex.reps}회 × ${ex.sets}세트`) 
-                                                            : `${ex.time}분 / ${ex.distance}km`}
+                                                        {ex.type === 'strength' ? (ex.duration ? `${ex.duration}초 × ${ex.sets}세트` : `${ex.reps}회 × ${ex.sets}세트`) : `${ex.time}분 / ${ex.distance}km`}
                                                         {ex.kcal && <span className="ml-2 text-gray-400">🔥 {ex.kcal}kcal</span>}
                                                     </div>
                                                 </div>

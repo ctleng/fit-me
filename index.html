@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -16,10 +15,10 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, initializeFirestore, memoryLocalCache, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously, deleteUser } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, initializeFirestore, memoryLocalCache, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        window.firebaseApp = { initializeApp, getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously, getFirestore, initializeFirestore, memoryLocalCache, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy };
+        window.firebaseApp = { initializeApp, getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously, deleteUser, getFirestore, initializeFirestore, memoryLocalCache, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, getDocs, addDoc };
     </script>
 
     <style>
@@ -29,6 +28,8 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade-in { animation: fadeIn 0.5s ease-in-out; }
+        .slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -51,10 +52,10 @@
         };
         // ===========================================================
 
+        // [보안] Gemini API Key 쪼개기
         const keyPart1 = "AIzaSy";
         const keyPart2 = "Cwrb5QCxsffhftTFdtXBnmK_Af4d9BgMM";
-        const apiKey = keyPart1 + keyPart2;
-             // Gemini API Key (선택 사항)
+        const apiKey = keyPart1 + keyPart2; 
 
         // 운동 데이터
         const EXERCISE_DATA = {
@@ -73,7 +74,7 @@
             '덤벨컬': { met: 3.0 }, '바벨컬': { met: 3.0 }, '이두': { met: 3.0 },
             '크런치': { met: 3.0 }, '레그레이즈': { met: 3.5 }, '윗몸일으키기': { met: 3.5 },
             '플랭크': { met: 3.5, isTimeBased: true },
-            '타바타': { met: 8.0 }, '인터벌트레이닝': { met: 8.0 }, 'HIIT': { met: 8.0 },
+            '타바타': { met: 9.0 }, '인터벌트레이닝': { met: 9.0 }, 'HIIT': { met: 9.0 },
             '요가': { met: 2.5 }, '필라테스': { met: 3.5 }, '크로스핏': { met: 8.5 },
             'default': { met: 3.5 }
         };
@@ -102,23 +103,17 @@
         };
 
         let app, auth, db, appId;
-        
         try {
             if (!window.firebaseApp) throw new Error("Firebase 로드 실패");
             let configToUse = myFirebaseConfig;
-            // 배포 환경과 개발 환경 자동 구분
             if (typeof __firebase_config !== 'undefined') {
                 configToUse = JSON.parse(__firebase_config);
-            } else {
-                if (myFirebaseConfig.apiKey.includes("여기에")) {
-                    throw new Error("CONFIG_NOT_SET");
-                }
+            } else if (myFirebaseConfig.apiKey.includes("여기에")) {
+                throw new Error("CONFIG_NOT_SET");
             }
-
             const { initializeApp, getAuth, getFirestore, initializeFirestore, memoryLocalCache } = window.firebaseApp;
             app = initializeApp(configToUse);
             auth = getAuth(app);
-            // [수정] 충돌 방지를 위해 메모리 캐시 모드로 초기화
             db = initializeFirestore(app, { localCache: memoryLocalCache() });
             appId = configToUse.projectId || 'default-app';
         } catch (e) {
@@ -156,22 +151,72 @@
             return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>;
         };
 
+        // --- [신규] 인트로 캐러셀 (앱 소개) ---
+        const IntroView = ({ onFinish }) => {
+            const [slide, setSlide] = useState(0);
+            const slides = [
+                { title: "매일 쌓이는 운동 기록", sub: "캘린더에 불꽃을 채우며 꾸준함을 증명하세요.", icon: "calendar", color: "text-blue-500" },
+                { title: "사진 한 장으로 끝!", sub: "귀찮은 검색은 그만! AI가 메뉴와 칼로리를 알려드려요.", icon: "camera", color: "text-green-500" },
+                { title: "확실한 동기부여", sub: "지루한 숫자 대신, 맛있는 음식으로 보상받는 기분!", icon: "fire", color: "text-orange-500" }
+            ];
+
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 animate-fade-in">
+                    <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm">
+                        <div className="w-full text-center mb-10">
+                            <div className={`w-32 h-32 mx-auto rounded-full bg-gray-50 flex items-center justify-center mb-6 animate-fade-in`}>
+                                <Icon name={slides[slide].icon} size={60} className={slides[slide].color} />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-800 mb-3">{slides[slide].title}</h2>
+                            <p className="text-gray-500 leading-relaxed">{slides[slide].sub}</p>
+                        </div>
+                        <div className="flex space-x-2 mb-8">
+                            {slides.map((_, i) => (
+                                <div key={i} className={`h-2 rounded-full transition-all ${i === slide ? 'w-8 bg-blue-500' : 'w-2 bg-gray-200'}`}></div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="w-full max-w-sm space-y-3">
+                        {slide < slides.length - 1 ? (
+                            <button onClick={() => setSlide(slide + 1)} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition-all">다음</button>
+                        ) : (
+                            <button onClick={onFinish} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition-all">시작하기</button>
+                        )}
+                        {slide < slides.length - 1 && (
+                            <button onClick={onFinish} className="w-full text-gray-400 text-sm py-2">건너뛰기</button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 로그인 화면 (Hook 추가) ---
         const LoginPage = ({ onLogin, error }) => (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 animate-fade-in">
-                <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center">
+                <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center">
                     <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Icon name="activity" size={40} className="text-blue-600" />
                     </div>
                     <h1 className="text-2xl font-bold text-gray-800 mb-2">Fit Me</h1>
                     <p className="text-gray-500 mb-8">나만의 AI 헬스 파트너</p>
-                    <button onClick={onLogin} className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3 px-4 rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all active:scale-95">
-                        <Icon name="google" className="w-5 h-5 mr-3 text-red-500" />구글 계정으로 시작하기
+                    
+                    {/* [Hook] 가입 유도 멘트 */}
+                    <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                        <p className="text-sm text-blue-800 font-bold mb-1">준비되셨나요? 🚀</p>
+                        <p className="text-xs text-blue-600">지금 가입하고, 나만의 목표를 세워보세요!</p>
+                    </div>
+
+                    <button onClick={onLogin} className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3.5 px-4 rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all active:scale-95">
+                        <Icon name="google" className="w-5 h-5 mr-3 text-red-500" />
+                        구글 계정으로 시작하기
                     </button>
                     {error && <div className="mt-6 p-3 bg-red-50 border border-red-200 rounded-lg text-left"><p className="text-xs text-red-600 font-bold mb-1">❌ 로그인 오류</p><p className="text-xs text-red-500 break-keep">{error}</p></div>}
                 </div>
+                <p className="mt-8 text-xs text-gray-400">데이터는 개인 Firebase에 안전하게 저장됩니다.</p>
             </div>
         );
 
+        // --- 온보딩 화면 (정보 입력) ---
         const OnboardingPage = ({ onSave }) => {
             const [form, setForm] = useState({ nickname: '', weight: '', height: '', muscle: '', age: '', gender: 'male', activityLevel: 'moderate' });
             const handleSubmit = () => {
@@ -182,7 +227,7 @@
                 <div className="min-h-screen flex flex-col items-center justify-center bg-blue-600 p-6 animate-fade-in text-white">
                     <div className="w-full max-w-sm text-center">
                         <h1 className="text-3xl font-bold mb-2">환영합니다! 👋</h1>
-                        <p className="mb-6 text-blue-100">정확한 분석을 위해 정보를 알려주세요.</p>
+                        <p className="mb-6 text-blue-100">더 정확한 분석을 위해 정보를 알려주세요.</p>
                         
                         <div className="bg-white rounded-2xl p-6 text-gray-800 shadow-lg text-left space-y-4 max-h-[80vh] overflow-y-auto">
                             <div>
@@ -286,8 +331,16 @@
             );
         };
 
-        const MyView = ({ user, handleLogout }) => {
+        const MyView = ({ user, handleLogout, deleteAccount }) => {
             const [viewMode, setViewMode] = useState('main'); 
+            const [withdrawReason, setWithdrawReason] = useState('');
+            const [customReason, setCustomReason] = useState('');
+
+            const handleWithdrawSubmit = () => {
+                if (!withdrawReason) return alert("탈퇴 사유를 선택해주세요.");
+                const reason = withdrawReason === '기타' ? customReason : withdrawReason;
+                deleteAccount(reason);
+            };
 
             if (viewMode === 'contact') {
                 return (
@@ -299,6 +352,27 @@
                             <p className="text-gray-500 leading-relaxed">추가하고 싶은 운동이나,<br/>개선 사항이 있으면 언제든 메일주세요.</p>
                             <a href="mailto:chongtaeklee@gmail.com" className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-blue-700 transition-colors flex items-center"><Icon name="send" size={18} className="mr-2" /> 메일 보내기</a>
                             <p className="text-sm text-gray-400 mt-4">chongtaeklee@gmail.com</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (viewMode === 'withdraw') {
+                return (
+                    <div className="h-full flex flex-col animate-fade-in p-4">
+                        <div className="flex items-center mb-6"><button onClick={() => setViewMode('main')} className="p-2 hover:bg-gray-200 rounded-full mr-2"><Icon name="chevronLeft" /></button><h2 className="text-xl font-bold text-red-600">회원 탈퇴</h2></div>
+                        <div className="flex-1 overflow-y-auto">
+                            <p className="text-gray-600 mb-6 text-sm">떠나시는 이유를 알려주시면,<br/>더 좋은 서비스로 발전하겠습니다.</p>
+                            <div className="space-y-3 mb-8">
+                                {['기록하는 게 귀찮아요', '원하는 기능이 없어요', '목표 체중을 달성했어요!', '앱 오류가 잦아요', '기타'].map(reason => (
+                                    <label key={reason} className={`flex items-center p-3 rounded-xl border cursor-pointer transition-all ${withdrawReason === reason ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}>
+                                        <input type="radio" name="reason" className="mr-3 accent-red-500" checked={withdrawReason === reason} onChange={() => setWithdrawReason(reason)} />
+                                        <span className="text-sm text-gray-700">{reason}</span>
+                                    </label>
+                                ))}
+                                {withdrawReason === '기타' && (<textarea className="w-full p-3 border rounded-xl text-sm mt-2" rows="3" placeholder="이유를 적어주세요..." value={customReason} onChange={e => setCustomReason(e.target.value)}></textarea>)}
+                            </div>
+                            <button onClick={handleWithdrawSubmit} className="w-full bg-red-500 text-white py-3 rounded-xl font-bold shadow-md hover:bg-red-600 transition-colors">탈퇴하기</button>
                         </div>
                     </div>
                 );
@@ -318,13 +392,14 @@
                         <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between hover:bg-gray-50 transition-colors text-red-500">
                             <div className="flex items-center"><div className="p-2 bg-red-50 text-red-500 rounded-lg mr-3"><Icon name="save" className="rotate-180" /></div><span className="font-medium">로그아웃</span></div><Icon name="chevronRight" className="text-gray-300" />
                         </button>
+                        <button onClick={() => setViewMode('withdraw')} className="w-full mt-4 text-xs text-gray-400 underline hover:text-red-500 transition-colors text-center">회원 탈퇴</button>
                     </div>
                 </div>
             );
         };
 
         const HealthTrackerApp = () => {
-            const { initializeApp, getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously, getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, initializeFirestore, memoryLocalCache } = window.firebaseApp;
+            const { initializeApp, getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut, signInAnonymously, deleteUser, getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, getDocs, addDoc, initializeFirestore, memoryLocalCache } = window.firebaseApp;
             const [user, setUser] = useState(null);
             const [profile, setProfile] = useState(null);
             const [activeTab, setActiveTab] = useState('calendar');
@@ -334,7 +409,8 @@
             const [loading, setLoading] = useState(true);
             const [loginError, setLoginError] = useState(null);
             const [period, setPeriod] = useState('month'); 
-            const [calendarViewMode, setCalendarViewMode] = useState('month'); 
+            const [calendarViewMode, setCalendarViewMode] = useState('month');
+            const [showIntro, setShowIntro] = useState(true); // [NEW] 인트로 노출 여부 상태
 
             useEffect(() => {
                 if (!auth) return;
@@ -344,10 +420,13 @@
                     }
                     onAuthStateChanged(auth, async (currentUser) => {
                         if (currentUser) {
+                            setShowIntro(false); // 로그인 되어있으면 인트로 건너뜀
                             const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'data', 'profile');
                             const docSnap = await getDoc(docRef);
-                            if (docSnap.exists()) setProfile(docSnap.data());
-                            else setProfile(null);
+                            const data = docSnap.data();
+                            if (docSnap.exists() && data.height) { setProfile(data); } else { setProfile(null); }
+                        } else {
+                            // 로그아웃 상태일 때만 인트로가 보일 수 있음 (기본값 true)
                         }
                         setUser(currentUser);
                         setLoading(false);
@@ -375,12 +454,40 @@
                 catch (error) { setLoginError("로그인 실패. 도메인 설정을 확인해주세요."); }
             };
 
-            const handleLogout = async () => { if (confirm("로그아웃 하시겠습니까?")) { await signOut(auth); setProfile(null); } };
+            const handleLogout = async () => { 
+                if (confirm("로그아웃 하시겠습니까?")) { 
+                    await signOut(auth); 
+                    setProfile(null); 
+                    setShowIntro(true); // 로그아웃 시 다시 인트로 보이게
+                } 
+            };
+
+            const handleDeleteAccount = async (reason) => {
+                if (!user) return;
+                if (!confirm("정말로 탈퇴하시겠습니까? 모든 데이터가 삭제됩니다.")) return;
+                
+                try {
+                    setLoading(true);
+                    await addDoc(collection(db, 'artifacts', appId, 'withdrawals'), { reason: reason, date: new Date().toISOString() });
+                    const logsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'users', user.uid, 'logs'));
+                    await Promise.all(logsSnapshot.docs.map(doc => deleteDoc(doc.ref)));
+                    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile'));
+                    await deleteUser(user);
+                    alert("탈퇴가 완료되었습니다.");
+                    window.location.reload();
+                } catch (error) {
+                    console.error("Delete Account Error:", error);
+                    alert("탈퇴 처리 중 오류가 발생했습니다. 다시 로그인 후 시도해주세요.");
+                    setLoading(false);
+                }
+            };
+
             const handleOnboardingComplete = async (data) => {
                 if (!user) return;
                 await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile'), data);
                 setProfile(data);
             };
+
             const saveLogToFirestore = async (date, data) => { if (!user) return; await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'logs', date), data, { merge: true }); };
             const deleteItemFromFirestore = async (date, type, id) => {
                 if (!user || !logs[date]) return;
@@ -388,27 +495,18 @@
                 await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'logs', date), { ...logs[date], [type]: updated }, { merge: true });
             };
 
+            // ... (recordSubTab, exerciseForm, dietForm, bodyForm, isAnalyzingImage 등 기존 state 유지)
             const [recordSubTab, setRecordSubTab] = useState('exercise');
             const [exerciseForm, setExerciseForm] = useState({ id: null, type: 'strength', name: '', weight: '', reps: '', sets: '', distance: '', time: '', duration: '' });
-            const [dietForm, setDietForm] = useState({ id: null, mealTime: 'lunch', menu: '', kcal: '', photo: null, items: [] }); // items state added
+            const [dietForm, setDietForm] = useState({ id: null, mealTime: 'lunch', menu: '', kcal: '', photo: null, items: [] });
             const [bodyForm, setBodyForm] = useState({ weight: '', muscle: '', fat: '', sugar: '' });
-            const [isAnalyzingImage, setIsAnalyzingImage] = useState(false); 
+            const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
 
-            const isTimeBasedExercise = (name) => {
-                for (const key in EXERCISE_DATA) {
-                    if (name.includes(key) && EXERCISE_DATA[key].isTimeBased) return true;
-                }
-                return false;
-            };
+            const isTimeBasedExercise = (name) => { for (const key in EXERCISE_DATA) { if (name.includes(key) && EXERCISE_DATA[key].isTimeBased) return true; } return false; };
 
             useEffect(() => { 
                 const logBody = logs[selectedDate]?.body;
-                setBodyForm({ 
-                    weight: logBody?.weight || profile?.weight || '', 
-                    muscle: logBody?.muscle || profile?.muscle || '', 
-                    fat: logBody?.fat || '', 
-                    sugar: logBody?.sugar || '' 
-                }); 
+                setBodyForm({ weight: logBody?.weight || profile?.weight || '', muscle: logBody?.muscle || profile?.muscle || '', fat: logBody?.fat || '', sugar: logBody?.sugar || '' }); 
             }, [selectedDate, logs, profile]);
 
             const calculateCalories = (exercise) => {
@@ -418,28 +516,16 @@
                 const gender = profile?.gender || 'male';
                 let met = 3.5;
                 let info = null;
-                for (const [key, value] of Object.entries(EXERCISE_DATA)) {
-                    if (exercise.name.includes(key)) { met = value.met; info = value; break; }
-                }
+                for (const [key, value] of Object.entries(EXERCISE_DATA)) { if (exercise.name.includes(key)) { met = value.met; info = value; break; } }
                 let durationHours = 0;
-                if (exercise.type === 'cardio') {
-                    durationHours = (parseFloat(exercise.time) || 0) / 60;
-                } else {
-                    if (info && info.isTimeBased) {
-                        const sets = parseFloat(exercise.sets) || 0;
-                        const seconds = parseFloat(exercise.duration) || 0;
-                        durationHours = (sets * seconds) / 3600;
-                    } else {
-                        const sets = parseFloat(exercise.sets) || 0;
-                        const liftWeight = parseFloat(exercise.weight) || 0;
-                        durationHours = (sets * 2) / 60; 
-                        met += Math.min(liftWeight * 0.05, 3.0); 
-                    }
+                if (exercise.type === 'cardio') { durationHours = (parseFloat(exercise.time) || 0) / 60; } 
+                else {
+                    if (info && info.isTimeBased) { const sets = parseFloat(exercise.sets) || 0; const seconds = parseFloat(exercise.duration) || 0; durationHours = (sets * seconds) / 3600; } 
+                    else { const sets = parseFloat(exercise.sets) || 0; const liftWeight = parseFloat(exercise.weight) || 0; durationHours = (sets * 2) / 60; met += Math.min(liftWeight * 0.05, 3.0); }
                 }
                 let bmrMultiplier = 1.0;
-                if (gender === 'male') bmrMultiplier += 0.05; 
-                if (age > 40) bmrMultiplier -= 0.05;
-                if (weight > 0 && muscle > 0 && (muscle/weight) > 0.35) bmrMultiplier += 0.1;
+                if (gender === 'male') bmrMultiplier += 0.05; if (age > 40) bmrMultiplier -= 0.05; if (age < 25) bmrMultiplier += 0.05;
+                if (weight > 0 && muscle > 0) { const muscleRatio = muscle / weight; if (muscleRatio > 0.45) bmrMultiplier += 0.15; else if (muscleRatio > 0.4) bmrMultiplier += 0.1; else if (muscleRatio > 0.35) bmrMultiplier += 0.05; }
                 return Math.round(met * weight * durationHours * bmrMultiplier);
             };
 
@@ -452,7 +538,6 @@
                 await saveLogToFirestore(selectedDate, { ...current, exercises: newEx });
                 setExerciseForm({ id: null, type: 'strength', name: '', weight: '', reps: '', sets: '', distance: '', time: '', duration: '' });
             };
-            
             const handleSaveDiet = async () => {
                 if (!dietForm.menu) return alert('메뉴 입력!');
                 const current = logs[selectedDate] || { exercises: [], diet: [], body: {} };
@@ -486,73 +571,46 @@
                 };
                 reader.readAsDataURL(file);
             };
-
             const analyzeFoodImage = async (base64Image) => {
-                if (!apiKey) return alert("Gemini API 키가 설정되지 않았습니다."); // 키 체크 추가
+                if (!apiKey) return alert("Gemini API 키가 설정되지 않았습니다.");
                 setIsAnalyzingImage(true);
                 try {
-                    const prompt = `이 음식 사진을 분석해줘. 
-                    1. 한식 상차림처럼 여러 반찬이 있다면, 메인 요리를 포함한 대표 이름(예: 제육 백반, 가정식 백반)을 'menu' 필드에 넣어줘.
-                    2. 사진에 보이는 밥, 국, 반찬 등 모든 음식의 칼로리를 합산해서 'kcal' 필드에 숫자만 넣어줘.
-                    3. 사진에서 식별된 구체적인 음식/반찬 목록을 'items' 필드에 배열로 넣어줘 (예: ["쌀밥", "미역국", "불고기", "김치"]).
-                    4. JSON 형식으로만 답해줘. 예시: {"menu": "된장찌개 정식", "kcal": 750, "items": ["쌀밥", "된장찌개", "김치", "어묵볶음"]}`;
-
+                    const prompt = `이 음식 사진을 분석해줘. 1. 한식 상차림처럼 여러 반찬이 있다면, 메인 요리를 포함한 대표 이름(예: 제육 백반, 가정식 백반)을 'menu' 필드에 넣어줘. 2. 사진에 보이는 밥, 국, 반찬 등 모든 음식의 칼로리를 합산해서 'kcal' 필드에 숫자만 넣어줘. 3. 사진에서 식별된 구체적인 음식/반찬 목록을 'items' 필드에 배열로 넣어줘 (예: ["쌀밥", "미역국", "불고기", "김치"]). 4. JSON 형식으로만 답해줘. 예시: {"menu": "된장찌개 정식", "kcal": 750, "items": ["쌀밥", "된장찌개", "김치", "어묵볶음"]}`;
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/jpeg", data: base64Image } }] }], generationConfig: { responseMimeType: "application/json" } })
                     });
-                    
-                    if (!response.ok) { // 응답 오류 처리
-                         const errorData = await response.json();
-                         throw new Error(errorData.error?.message || "API 요청 실패");
-                    }
-
+                    if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error?.message || "API 요청 실패"); }
                     const data = await response.json();
                     const result = JSON.parse(data.candidates[0].content.parts[0].text);
                     setDietForm(prev => ({ ...prev, menu: result.menu || '', kcal: result.kcal || '', items: result.items || [] }));
-                } catch (error) { 
-                    console.error("Image Analysis Error:", error); 
-                    alert(`사진 분석에 실패했습니다.\n이유: ${error.message}`); 
-                } 
+                } catch (error) { console.error("Image Analysis Error:", error); alert(`사진 분석에 실패했습니다.\n이유: ${error.message}`); } 
                 finally { setIsAnalyzingImage(false); }
             };
-
             const handleSearchCalories = async () => {
                 if (!dietForm.menu) return alert("음식 이름을 먼저 입력해주세요!");
-                if (!apiKey) return alert("Gemini API 키가 설정되지 않았습니다."); // 키 체크 추가
+                if (!apiKey) return alert("Gemini API 키가 설정되지 않았습니다.");
                 setIsAnalyzingImage(true);
                 try {
                     const prompt = `음식 '${dietForm.menu}' 1인분의 대략적인 칼로리(kcal)를 숫자만 알려줘. 부가 설명 없이 숫자만. 예: 300`;
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                     });
-
-                    if (!response.ok) { // 응답 오류 처리
-                        const errorData = await response.json();
-                        throw new Error(errorData.error?.message || "API 요청 실패");
-                    }
-
+                    if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error?.message || "API 요청 실패"); }
                     const data = await response.json();
                     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     const kcal = text.replace(/[^0-9]/g, ''); 
                     if (kcal) setDietForm(prev => ({ ...prev, kcal: kcal }));
                     else alert("칼로리 정보를 찾지 못했습니다.");
-                } catch (e) {
-                    console.error("Search Error:", e);
-                    alert(`검색 중 오류가 발생했습니다.\n이유: ${e.message}`);
-                } finally {
-                    setIsAnalyzingImage(false);
-                }
+                } catch (e) { console.error("Search Error:", e); alert(`검색 중 오류가 발생했습니다.\n이유: ${e.message}`); } finally { setIsAnalyzingImage(false); }
             };
 
             const getDaysInMonth = (d) => { const y = d.getFullYear(), m = d.getMonth(); return { days: new Date(y, m + 1, 0).getDate(), firstDay: new Date(y, m, 1).getDay(), year: y, month: m }; };
             const changeMonth = (off) => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + off, 1));
-
-            // --- 캘린더 뷰 ---
-            const CalendarView = () => {
+            
+            // --- 뷰 렌더링 함수들 (이전 코드와 동일, 생략 없이 포함됨) ---
+            const CalendarView = () => { /* ... (이전과 동일) ... */ 
                 const { days, firstDay, year, month } = getDaysInMonth(currentMonth);
                 const dayLog = logs[selectedDate];
 
@@ -586,7 +644,6 @@
                                                     <div className="text-xs text-green-600 font-medium">{d.mealTime} • {d.kcal} kcal</div>
                                                 </div>
                                             </div>
-                                            {/* 인식된 아이템 리스트 표시 */}
                                             {d.items && d.items.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-2">
                                                     {d.items.map((item, i) => (
@@ -653,7 +710,7 @@
                 );
             };
 
-            const RecordView = () => {
+            const RecordView = () => { /* ... (이전과 동일) ... */ 
                 const isPlankType = isTimeBasedExercise(exerciseForm.name);
                 return (
                     <div className="h-full overflow-y-auto pb-20 no-scrollbar">
@@ -724,7 +781,6 @@
                                     {isAnalyzingImage && <div className="text-center text-xs text-green-600 mt-2 flex items-center justify-center animate-pulse-custom"><Icon name="loader" className="animate-spin mr-1" size={12}/> AI가 음식을 분석 중입니다...</div>}
                                 </div>
                                 <div className="space-y-3">
-                                    {/* 칼로리 검색 기능 추가 */}
                                     <div className="flex gap-2">
                                         <input type="text" placeholder="메뉴" className="flex-1 p-3 border rounded-lg" value={dietForm.menu} onChange={(e) => setDietForm({...dietForm, menu: e.target.value})} />
                                         <button onClick={handleSearchCalories} className="px-3 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors" title="칼로리 검색">
@@ -732,7 +788,6 @@
                                         </button>
                                     </div>
                                     <input type="number" placeholder="칼로리" className="w-full p-3 border rounded-lg" value={dietForm.kcal} onChange={(e) => setDietForm({...dietForm, kcal: e.target.value})} />
-                                    {/* 인식된 아이템 표시 (수정 가능) */}
                                     {dietForm.items && dietForm.items.length > 0 && (
                                         <div className="flex flex-wrap gap-1">
                                             {dietForm.items.map((item, i) => (
@@ -768,7 +823,7 @@
                 );
             };
 
-            const StatsView = () => {
+            const StatsView = () => { /* ... (이전과 동일) ... */ 
                 const now = new Date();
                 const todayStr = new Date(Date.now() + 32400000).toISOString().split('T')[0];
 
@@ -854,7 +909,13 @@
             };
 
             if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50 text-gray-500">로딩 중...</div>;
-            if (!user) return <LoginPage onLogin={handleGoogleLogin} error={loginError} />;
+            
+            // [NEW] 로그인 안 했으면 IntroView 먼저 보여주고, Start 누르면 LoginPage 보여줌
+            if (!user) {
+                if (showIntro) return <IntroView onFinish={() => setShowIntro(false)} />;
+                return <LoginPage onLogin={handleGoogleLogin} error={loginError} />;
+            }
+            // 로그인 했어도 프로필 없으면 OnboardingPage
             if (!profile) return <OnboardingPage onSave={handleOnboardingComplete} />;
 
             return (
@@ -866,7 +927,7 @@
                         {activeTab === 'calendar' && CalendarView()}
                         {activeTab === 'record' && RecordView()}
                         {activeTab === 'stats' && StatsView()}
-                        {activeTab === 'my' && <MyView user={user} handleLogout={handleLogout} />}
+                        {activeTab === 'my' && <MyView user={user} handleLogout={handleLogout} deleteAccount={handleDeleteAccount} />}
                     </main>
                     <nav className="bg-white border-t flex justify-around items-center h-16 pb-safe z-20">
                         <button onClick={() => { setActiveTab('calendar'); setCalendarViewMode('month'); }} className={`flex flex-col items-center w-full h-full ${activeTab === 'calendar' ? 'text-blue-600' : 'text-gray-400'}`}><Icon name="calendar" /><span className="text-xs">출석부</span></button>

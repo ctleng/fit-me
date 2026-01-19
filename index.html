@@ -30,6 +30,9 @@
         .animate-fade-in { animation: fadeIn 0.5s ease-in-out; }
         .slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
         @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        /* 링 차트 애니메이션 */
+        .progress-ring__circle { transition: stroke-dashoffset 0.5s ease-in-out; transform: rotate(-90deg); transform-origin: 50% 50%; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -74,7 +77,7 @@
             '덤벨컬': { met: 3.0 }, '바벨컬': { met: 3.0 }, '이두': { met: 3.0 },
             '크런치': { met: 3.0 }, '레그레이즈': { met: 3.5 }, '윗몸일으키기': { met: 3.5 },
             '플랭크': { met: 3.5, isTimeBased: true },
-            '타바타': { met: 9.0 }, '인터벌트레이닝': { met: 9.0 }, 'HIIT': { met: 9.0 },
+            '타바타': { met: 8.0 }, '인터벌트레이닝': { met: 8.0 }, 'HIIT': { met: 8.0 },
             '요가': { met: 2.5 }, '필라테스': { met: 3.5 }, '크로스핏': { met: 8.5 },
             'default': { met: 3.5 }
         };
@@ -103,17 +106,23 @@
         };
 
         let app, auth, db, appId;
+        
         try {
             if (!window.firebaseApp) throw new Error("Firebase 로드 실패");
             let configToUse = myFirebaseConfig;
+            // 배포 환경과 개발 환경 자동 구분
             if (typeof __firebase_config !== 'undefined') {
                 configToUse = JSON.parse(__firebase_config);
-            } else if (myFirebaseConfig.apiKey.includes("여기에")) {
-                throw new Error("CONFIG_NOT_SET");
+            } else {
+                if (myFirebaseConfig.apiKey.includes("여기에")) {
+                    throw new Error("CONFIG_NOT_SET");
+                }
             }
+
             const { initializeApp, getAuth, getFirestore, initializeFirestore, memoryLocalCache } = window.firebaseApp;
             app = initializeApp(configToUse);
             auth = getAuth(app);
+            // 충돌 방지를 위해 메모리 캐시 모드로 초기화
             db = initializeFirestore(app, { localCache: memoryLocalCache() });
             appId = configToUse.projectId || 'default-app';
         } catch (e) {
@@ -149,6 +158,40 @@
                 search: <><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></>
             };
             return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>;
+        };
+
+        // --- 원형 차트 (더블 링 대시보드용) ---
+        const ProgressRing = ({ radius, stroke, progress, color, label, subLabel, max, onClick }) => {
+            const normalizedRadius = radius - stroke * 2;
+            const circumference = normalizedRadius * 2 * Math.PI;
+            const strokeDashoffset = circumference - (Math.min(progress, max) / max) * circumference;
+            const isOver = progress > max;
+
+            return (
+                <div className="flex flex-col items-center cursor-pointer" onClick={onClick}>
+                    <div className="relative flex items-center justify-center">
+                        <svg height={radius * 2} width={radius * 2}>
+                            <circle stroke="#e5e7eb" strokeWidth={stroke} fill="transparent" r={normalizedRadius} cx={radius} cy={radius} />
+                            <circle
+                                className="progress-ring__circle"
+                                stroke={isOver ? (color === 'blue' ? '#FBBF24' : '#EF4444') : (color === 'blue' ? '#3B82F6' : '#10B981')} // 오버되면 색상 변경 (골드/레드)
+                                strokeWidth={stroke}
+                                strokeDasharray={circumference + ' ' + circumference}
+                                style={{ strokeDashoffset }}
+                                strokeLinecap="round"
+                                fill="transparent"
+                                r={normalizedRadius}
+                                cx={radius}
+                                cy={radius}
+                            />
+                        </svg>
+                        <div className="absolute text-center">
+                            <span className={`text-xl font-bold ${isOver ? 'text-red-500' : 'text-gray-800'}`}>{label}</span>
+                            <span className="block text-[10px] text-gray-400">{subLabel}</span>
+                        </div>
+                    </div>
+                </div>
+            );
         };
 
         // --- [신규] 인트로 캐러셀 (앱 소개) ---
@@ -190,7 +233,7 @@
             );
         };
 
-        // --- 로그인 화면 (Hook 추가) ---
+        // --- 로그인 화면 ---
         const LoginPage = ({ onLogin, error }) => (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 animate-fade-in">
                 <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center">
@@ -199,85 +242,131 @@
                     </div>
                     <h1 className="text-2xl font-bold text-gray-800 mb-2">Fit Me</h1>
                     <p className="text-gray-500 mb-8">나만의 AI 헬스 파트너</p>
-                    
-                    {/* [Hook] 가입 유도 멘트 */}
                     <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
                         <p className="text-sm text-blue-800 font-bold mb-1">준비되셨나요? 🚀</p>
                         <p className="text-xs text-blue-600">지금 가입하고, 나만의 목표를 세워보세요!</p>
                     </div>
-
                     <button onClick={onLogin} className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3.5 px-4 rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all active:scale-95">
                         <Icon name="google" className="w-5 h-5 mr-3 text-red-500" />
                         구글 계정으로 시작하기
                     </button>
                     {error && <div className="mt-6 p-3 bg-red-50 border border-red-200 rounded-lg text-left"><p className="text-xs text-red-600 font-bold mb-1">❌ 로그인 오류</p><p className="text-xs text-red-500 break-keep">{error}</p></div>}
                 </div>
-                <p className="mt-8 text-xs text-gray-400">데이터는 개인 Firebase에 안전하게 저장됩니다.</p>
             </div>
         );
 
-        // --- 온보딩 화면 (정보 입력) ---
+        // --- 온보딩 화면 (정보 + 목표 설정) ---
         const OnboardingPage = ({ onSave }) => {
+            const [step, setStep] = useState(1);
             const [form, setForm] = useState({ nickname: '', weight: '', height: '', muscle: '', age: '', gender: 'male', activityLevel: 'moderate' });
-            const handleSubmit = () => {
-                if (!form.nickname || !form.weight || !form.height) return alert('닉네임, 키, 체중은 필수입니다.');
-                onSave(form);
+            const [goal, setGoal] = useState({ targetWeight: '', duration: 3 });
+
+            const handleNext = () => {
+                if (!form.nickname || !form.weight || !form.height) return alert('기본 정보를 모두 입력해주세요.');
+                setStep(2);
             };
+
+            const calculateDifficulty = () => {
+                const current = parseFloat(form.weight);
+                const target = parseFloat(goal.targetWeight);
+                if (!current || !target || !goal.duration) return null;
+                if (target >= current) return { label: '증량/유지', msg: "건강한 증량/유지 목표네요! 근력 운동 위주로 추천해드릴게요.", color: "text-blue-600 bg-blue-50" };
+                const loss = current - target;
+                const weeks = goal.duration * 4.3;
+                const weeklyLoss = loss / weeks;
+                if (weeklyLoss < 0.5) return { label: 'EASY', msg: "충분히 가능해요! 🍵\n천천히 건강하게 빠지는 속도입니다.", color: "text-green-600 bg-green-50" };
+                if (weeklyLoss <= 0.8) return { label: 'NORMAL', msg: "가장 이상적인 목표예요! 👍\n표준적인 속도입니다. 꾸준함이 답!", color: "text-blue-600 bg-blue-50" };
+                if (weeklyLoss <= 1.2) return { label: 'HARD', msg: "조금 타이트한 도전이에요! 🔥\n식단 관리가 꽤 중요합니다.", color: "text-orange-600 bg-orange-50" };
+                return { label: 'EXTREME', msg: "건강에 무리가 될 수 있어요 🚨\n기간을 더 늘리시는 걸 추천해요.", color: "text-red-600 bg-red-50" };
+            };
+
+            const handleSubmit = () => {
+                if (!goal.targetWeight) return alert('목표 체중을 입력해주세요.');
+                const targetDate = new Date();
+                targetDate.setMonth(targetDate.getMonth() + goal.duration);
+                // BMR & TDEE & Goal Calculation
+                const bmr = (form.gender === 'male' ? (10 * form.weight) + (6.25 * form.height) - (5 * form.age) + 5 : (10 * form.weight) + (6.25 * form.height) - (5 * form.age) - 161);
+                const activityMultipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+                const tdee = Math.round(bmr * activityMultipliers[form.activityLevel]);
+                
+                // Goal logic
+                const lossNeeded = form.weight - goal.targetWeight;
+                const totalDeficit = lossNeeded * 7700; 
+                const days = goal.duration * 30;
+                const dailyDeficit = Math.round(totalDeficit / days);
+                
+                const dailyDietGoal = Math.max(tdee - 300 - (dailyDeficit * 0.7), 1200); // 1200 min safety
+                const weeklyWorkoutGoal = Math.round((dailyDeficit * 0.3) * 7);
+
+                onSave({ ...form, ...goal, targetDate: targetDate.toISOString().split('T')[0], tdee, dailyDietGoal, weeklyWorkoutGoal });
+            };
+
+            const difficulty = calculateDifficulty();
+
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center bg-blue-600 p-6 animate-fade-in text-white">
-                    <div className="w-full max-w-sm text-center">
-                        <h1 className="text-3xl font-bold mb-2">환영합니다! 👋</h1>
-                        <p className="mb-6 text-blue-100">더 정확한 분석을 위해 정보를 알려주세요.</p>
-                        
+                    <div className="w-full max-w-sm">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold mb-2">{step === 1 ? "환영합니다! 👋" : "목표 설정 🎯"}</h1>
+                            <p className="text-blue-100">{step === 1 ? "더 정확한 분석을 위해 정보를 알려주세요." : "이루고 싶은 목표를 알려주세요."}</p>
+                        </div>
                         <div className="bg-white rounded-2xl p-6 text-gray-800 shadow-lg text-left space-y-4 max-h-[80vh] overflow-y-auto">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">닉네임 <span className="text-red-500">*</span></label>
-                                <input type="text" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 헬린이" value={form.nickname} onChange={e => setForm({...form, nickname: e.target.value})} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">키 (cm) <span className="text-red-500">*</span></label>
-                                    <input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 175" value={form.height} onChange={e => setForm({...form, height: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">체중 (kg) <span className="text-red-500">*</span></label>
-                                    <input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 70" value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} />
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">평소 활동량 <span className="text-red-500">*</span></label>
-                                <select className="w-full p-3 border rounded-lg bg-gray-50" value={form.activityLevel} onChange={e => setForm({...form, activityLevel: e.target.value})}>
-                                    <option value="sedentary">비활동적 (운동 안 함)</option>
-                                    <option value="light">약간 활동적 (주 1-3회)</option>
-                                    <option value="moderate">보통 활동적 (주 3-5회)</option>
-                                    <option value="active">매우 활동적 (주 6-7회)</option>
-                                    <option value="very_active">초고강도 (육체 노동 등)</option>
-                                </select>
-                            </div>
-
-                            <div className="pt-4 border-t border-gray-100">
-                                <p className="text-xs text-blue-600 font-bold mb-3 flex items-center"><Icon name="info" size={12} className="mr-1"/> 추가 정보 (선택)</p>
-                                <div className="grid grid-cols-2 gap-3 mb-3">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 mb-1">나이</label>
-                                        <input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 30" value={form.age} onChange={e => setForm({...form, age: e.target.value})} />
+                            {step === 1 ? (
+                                <>
+                                    <div><label className="block text-xs font-bold text-gray-500 mb-1">닉네임 *</label><input type="text" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 헬린이" value={form.nickname} onChange={e => setForm({...form, nickname: e.target.value})} /></div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">키 (cm) *</label><input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="175" value={form.height} onChange={e => setForm({...form, height: e.target.value})} /></div>
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">체중 (kg) *</label><input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="70" value={form.weight} onChange={e => setForm({...form, weight: e.target.value})} /></div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-gray-500 mb-1">성별</label>
-                                        <select className="w-full p-3 border rounded-lg bg-gray-50" value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}>
-                                            <option value="male">남성</option>
-                                            <option value="female">여성</option>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">평소 활동량 *</label>
+                                        <select className="w-full p-3 border rounded-lg bg-gray-50" value={form.activityLevel} onChange={e => setForm({...form, activityLevel: e.target.value})}>
+                                            <option value="sedentary">비활동적 (운동 안 함)</option>
+                                            <option value="light">약간 활동적 (주 1-3회)</option>
+                                            <option value="moderate">보통 활동적 (주 3-5회)</option>
+                                            <option value="active">매우 활동적 (주 6-7회)</option>
+                                            <option value="very_active">초고강도 (육체 노동 등)</option>
                                         </select>
                                     </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">골격근량 (kg)</label>
-                                    <input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="인바디 수치" value={form.muscle} onChange={e => setForm({...form, muscle: e.target.value})} />
-                                </div>
-                            </div>
-
-                            <button onClick={handleSubmit} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-4 hover:bg-blue-700 transition-colors">시작하기</button>
+                                    <div className="pt-4 border-t border-gray-100">
+                                        <p className="text-xs text-blue-600 font-bold mb-3 flex items-center"><Icon name="info" size={12} className="mr-1"/> 추가 정보 (선택)</p>
+                                        <div className="grid grid-cols-2 gap-3 mb-3">
+                                            <div><label className="block text-xs font-bold text-gray-500 mb-1">나이</label><input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="예: 30" value={form.age} onChange={e => setForm({...form, age: e.target.value})} /></div>
+                                            <div><label className="block text-xs font-bold text-gray-500 mb-1">성별</label><select className="w-full p-3 border rounded-lg bg-gray-50" value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}><option value="male">남성</option><option value="female">여성</option></select></div>
+                                        </div>
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">골격근량 (kg)</label><input type="number" className="w-full p-3 border rounded-lg bg-gray-50" placeholder="인바디 수치" value={form.muscle} onChange={e => setForm({...form, muscle: e.target.value})} /></div>
+                                    </div>
+                                    <button onClick={handleNext} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold mt-4">다음</button>
+                                </>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">목표 체중 (kg)</label>
+                                        <div className="flex items-center gap-2">
+                                            <input type="number" className="w-full p-3 border rounded-lg bg-gray-50 font-bold text-lg text-blue-600" placeholder={form.weight} value={goal.targetWeight} onChange={e => setGoal({...goal, targetWeight: e.target.value})} />
+                                            <span className="text-gray-400 text-sm whitespace-nowrap">{goal.targetWeight && form.weight ? `${(goal.targetWeight - form.weight).toFixed(1)}kg` : ''}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-2">언제까지 달성할까요?</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[1, 2, 3, 6, 12].map(m => (
+                                                <button key={m} onClick={() => setGoal({...goal, duration: m})} className={`py-2 rounded-lg text-sm font-bold border ${goal.duration === m ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>{m}개월 후</button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {difficulty && (
+                                        <div className={`p-4 rounded-xl border ${difficulty.color} bg-opacity-10 border-opacity-20`}>
+                                            <p className="font-bold text-sm mb-1">{difficulty.label}</p>
+                                            <p className="text-xs whitespace-pre-line leading-relaxed">{difficulty.msg}</p>
+                                        </div>
+                                    )}
+                                    <div className="flex gap-2 mt-4">
+                                        <button onClick={() => setStep(1)} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-lg font-bold">이전</button>
+                                        <button onClick={handleSubmit} className="flex-[2] bg-blue-600 text-white py-3 rounded-lg font-bold shadow-md">Fit Me 시작하기</button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -410,7 +499,7 @@
             const [loginError, setLoginError] = useState(null);
             const [period, setPeriod] = useState('month'); 
             const [calendarViewMode, setCalendarViewMode] = useState('month');
-            const [showIntro, setShowIntro] = useState(true); // [NEW] 인트로 노출 여부 상태
+            const [showIntro, setShowIntro] = useState(true); 
 
             useEffect(() => {
                 if (!auth) return;
@@ -420,13 +509,11 @@
                     }
                     onAuthStateChanged(auth, async (currentUser) => {
                         if (currentUser) {
-                            setShowIntro(false); // 로그인 되어있으면 인트로 건너뜀
+                            setShowIntro(false);
                             const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'data', 'profile');
                             const docSnap = await getDoc(docRef);
                             const data = docSnap.data();
                             if (docSnap.exists() && data.height) { setProfile(data); } else { setProfile(null); }
-                        } else {
-                            // 로그아웃 상태일 때만 인트로가 보일 수 있음 (기본값 true)
                         }
                         setUser(currentUser);
                         setLoading(false);
@@ -454,13 +541,7 @@
                 catch (error) { setLoginError("로그인 실패. 도메인 설정을 확인해주세요."); }
             };
 
-            const handleLogout = async () => { 
-                if (confirm("로그아웃 하시겠습니까?")) { 
-                    await signOut(auth); 
-                    setProfile(null); 
-                    setShowIntro(true); // 로그아웃 시 다시 인트로 보이게
-                } 
-            };
+            const handleLogout = async () => { if (confirm("로그아웃 하시겠습니까?")) { await signOut(auth); setProfile(null); setShowIntro(true); } };
 
             const handleDeleteAccount = async (reason) => {
                 if (!user) return;
@@ -495,7 +576,6 @@
                 await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'logs', date), { ...logs[date], [type]: updated }, { merge: true });
             };
 
-            // ... (recordSubTab, exerciseForm, dietForm, bodyForm, isAnalyzingImage 등 기존 state 유지)
             const [recordSubTab, setRecordSubTab] = useState('exercise');
             const [exerciseForm, setExerciseForm] = useState({ id: null, type: 'strength', name: '', weight: '', reps: '', sets: '', distance: '', time: '', duration: '' });
             const [dietForm, setDietForm] = useState({ id: null, mealTime: 'lunch', menu: '', kcal: '', photo: null, items: [] });
@@ -571,6 +651,7 @@
                 };
                 reader.readAsDataURL(file);
             };
+
             const analyzeFoodImage = async (base64Image) => {
                 if (!apiKey) return alert("Gemini API 키가 설정되지 않았습니다.");
                 setIsAnalyzingImage(true);
@@ -587,6 +668,7 @@
                 } catch (error) { console.error("Image Analysis Error:", error); alert(`사진 분석에 실패했습니다.\n이유: ${error.message}`); } 
                 finally { setIsAnalyzingImage(false); }
             };
+
             const handleSearchCalories = async () => {
                 if (!dietForm.menu) return alert("음식 이름을 먼저 입력해주세요!");
                 if (!apiKey) return alert("Gemini API 키가 설정되지 않았습니다.");
@@ -608,13 +690,14 @@
 
             const getDaysInMonth = (d) => { const y = d.getFullYear(), m = d.getMonth(); return { days: new Date(y, m + 1, 0).getDate(), firstDay: new Date(y, m, 1).getDay(), year: y, month: m }; };
             const changeMonth = (off) => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + off, 1));
-            
-            // --- 뷰 렌더링 함수들 (이전 코드와 동일, 생략 없이 포함됨) ---
-            const CalendarView = () => { /* ... (이전과 동일) ... */ 
+
+            // --- 캘린더 뷰 (수정됨: 대시보드 포함) ---
+            const CalendarView = () => {
                 const { days, firstDay, year, month } = getDaysInMonth(currentMonth);
                 const dayLog = logs[selectedDate];
 
                 if (calendarViewMode === 'detail') {
+                    // ... (기존 상세 보기 로직 유지)
                     return (
                         <div className="flex flex-col h-full animate-fade-in pb-20 overflow-y-auto no-scrollbar">
                             <div className="flex items-center mb-4">
@@ -667,11 +750,43 @@
                     );
                 }
 
-                const totalBurned = dayLog?.exercises?.reduce((sum, ex) => sum + (ex.kcal || 0), 0) || 0;
-                const totalIntake = dayLog?.diet?.reduce((sum, d) => sum + (parseInt(d.kcal) || 0), 0) || 0;
+                // [NEW] 대시보드 계산 로직 (선택된 날짜 기준)
+                const currentSelectedDate = new Date(selectedDate);
+                const dayIntake = dayLog?.diet?.reduce((sum, d) => sum + (parseInt(d.kcal) || 0), 0) || 0;
+                
+                // 주간 운동 합계 (선택된 날짜가 포함된 주)
+                const startOfWeek = new Date(currentSelectedDate);
+                startOfWeek.setDate(currentSelectedDate.getDate() - currentSelectedDate.getDay());
+                startOfWeek.setHours(0,0,0,0);
+                
+                let weeklyBurned = 0;
+                Object.entries(logs).forEach(([dStr, log]) => {
+                    const d = new Date(dStr);
+                    // 그 주의 데이터만 합산
+                    if (d >= startOfWeek && d < new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000) && log.exercises) {
+                        weeklyBurned += log.exercises.reduce((s, e) => s + (e.kcal || 0), 0);
+                    }
+                });
+
+                const dietGoal = profile?.dailyDietGoal || 2000;
+                const workoutGoal = profile?.weeklyWorkoutGoal || 2000;
+                const remainingDiet = dietGoal - dayIntake;
 
                 return (
                     <div className="flex flex-col h-full animate-fade-in">
+                        {/* [NEW] 대시보드 링 */}
+                        <div className="grid grid-cols-2 gap-4 mb-6 mt-2">
+                             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setCalendarViewMode('detail')}>
+                                <h3 className="text-xs font-bold text-gray-400 mb-2">{selectedDate.slice(5).replace('-','/')} 식단</h3>
+                                <ProgressRing radius={50} stroke={8} progress={dayIntake} max={dietGoal} color="green" label={remainingDiet > 0 ? `${remainingDiet}` : `${remainingDiet}`} subLabel={remainingDiet >= 0 ? "kcal 남음" : "kcal 초과!"} />
+                            </div>
+                            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => { setActiveTab('stats'); setPeriod('week'); }}>
+                                <h3 className="text-xs font-bold text-gray-400 mb-2">주간 운동 달성</h3>
+                                <ProgressRing radius={50} stroke={8} progress={weeklyBurned} max={workoutGoal} color="blue" label={`${Math.min(Math.round((weeklyBurned/workoutGoal)*100), 999)}%`} subLabel={`${weeklyBurned} kcal`} />
+                            </div>
+                        </div>
+
+                        {/* 기존 캘린더 */}
                         <div className="flex justify-between items-center mb-4 px-2">
                             <button onClick={() => changeMonth(-1)} className="p-2"><Icon name="chevronLeft" /></button>
                             <h2 className="text-xl font-bold">{year}년 {month + 1}월</h2>
@@ -688,7 +803,8 @@
                                         key={day} 
                                         onClick={() => {
                                             setSelectedDate(dStr);
-                                            setCalendarViewMode('detail');
+                                            // 날짜 클릭 시 대시보드만 업데이트하고 상세뷰로 넘기지 않음 (기획 변경)
+                                            // setCalendarViewMode('detail'); 
                                         }} 
                                         className={`h-14 sm:h-20 border rounded-lg flex flex-col items-center justify-start pt-1 cursor-pointer transition-all hover:bg-blue-50 ${dStr === selectedDate ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 bg-white'}`}
                                     >
@@ -700,130 +816,14 @@
                         </div>
                         <div className="mt-4 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
                              <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-gray-800">{selectedDate} 요약</h3></div>
-                            <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                                <div className="bg-orange-50 p-3 rounded-lg text-orange-800"><span className="block text-xs text-orange-500 mb-1">🔥 소모</span><span className="font-bold text-xl">{totalBurned}</span> kcal</div>
-                                <div className="bg-green-50 p-3 rounded-lg text-green-800"><span className="block text-xs text-green-500 mb-1">🥗 섭취</span><span className="font-bold text-xl">{totalIntake}</span> kcal</div>
-                            </div>
+                             <div className="text-center py-2 text-gray-400 text-sm">위쪽 링을 눌러 상세 정보를 확인하세요 👆</div>
                             <button onClick={() => setActiveTab('record')} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold flex justify-center items-center shadow-md active:scale-95 transition-transform"><Icon name="plus" className="w-5 h-5 mr-2" /> 기록하러 가기</button>
                         </div>
                     </div>
                 );
             };
 
-            const RecordView = () => { /* ... (이전과 동일) ... */ 
-                const isPlankType = isTimeBasedExercise(exerciseForm.name);
-                return (
-                    <div className="h-full overflow-y-auto pb-20 no-scrollbar">
-                        <h2 className="text-xl font-bold mb-4">{selectedDate} 기록</h2>
-                        <div className="flex bg-gray-200 p-1 rounded-xl mb-6">
-                            <button onClick={() => setRecordSubTab('exercise')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${recordSubTab === 'exercise' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}>운동</button>
-                            <button onClick={() => setRecordSubTab('diet')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${recordSubTab === 'diet' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`}>식단</button>
-                        </div>
-                        {recordSubTab === 'exercise' ? (
-                            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
-                                <h3 className="font-bold text-lg mb-4 flex items-center text-blue-600"><Icon name="dumbbell" className="mr-2" /> 운동</h3>
-                                <div className="flex gap-2 mb-4 p-1 bg-gray-50 rounded-lg">
-                                    <button onClick={() => setExerciseForm({ ...exerciseForm, type: 'strength' })} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${exerciseForm.type === 'strength' ? 'bg-purple-100 text-purple-700 shadow-sm ring-1 ring-purple-200' : 'text-gray-400 hover:text-gray-600'}`}><Icon name="dumbbell" size={16} className="mr-1" /> 근력</button>
-                                    <button onClick={() => setExerciseForm({ ...exerciseForm, type: 'cardio' })} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${exerciseForm.type === 'cardio' ? 'bg-orange-100 text-orange-700 shadow-sm ring-1 ring-orange-200' : 'text-gray-400 hover:text-gray-600'}`}><div className="flex items-center"><span className="mr-1 text-lg">🏃</span> 유산소</div></button>
-                                </div>
-                                <div className="space-y-3">
-                                    <input type="text" list="exercise-list" placeholder="종목 (예: 스쿼트, 플랭크)" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value={exerciseForm.name} onChange={(e) => setExerciseForm({...exerciseForm, name: e.target.value})} />
-                                    <datalist id="exercise-list">{POPULAR_EXERCISES.map(ex => <option key={ex} value={ex} />)}</datalist>
-                                    <div className="flex gap-2">
-                                        {exerciseForm.type === 'strength' ? (
-                                            isPlankType ? (
-                                                <>
-                                                    <input type="number" placeholder="시간(초)" className="w-full p-3 border rounded-lg" value={exerciseForm.duration} onChange={(e) => setExerciseForm({...exerciseForm, duration: e.target.value})} />
-                                                    <input type="number" placeholder="세트" className="w-full p-3 border rounded-lg" value={exerciseForm.sets} onChange={(e) => setExerciseForm({...exerciseForm, sets: e.target.value})} />
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <input type="number" placeholder="무게(kg)" className="w-full p-3 border rounded-lg" value={exerciseForm.weight} onChange={(e) => setExerciseForm({...exerciseForm, weight: e.target.value})} />
-                                                    <input type="number" placeholder="횟수" className="w-full p-3 border rounded-lg" value={exerciseForm.reps} onChange={(e) => setExerciseForm({...exerciseForm, reps: e.target.value})} />
-                                                    <input type="number" placeholder="세트" className="w-full p-3 border rounded-lg" value={exerciseForm.sets} onChange={(e) => setExerciseForm({...exerciseForm, sets: e.target.value})} />
-                                                </>
-                                            )
-                                        ) : (
-                                            <>
-                                                <input type="number" placeholder="거리(km)" className="w-full p-3 border rounded-lg" value={exerciseForm.distance} onChange={(e) => setExerciseForm({...exerciseForm, distance: e.target.value})} />
-                                                <input type="number" placeholder="시간(분)" className="w-full p-3 border rounded-lg" value={exerciseForm.time} onChange={(e) => setExerciseForm({...exerciseForm, time: e.target.value})} />
-                                            </>
-                                        )}
-                                    </div>
-                                    <button onClick={handleSaveExercise} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold shadow-md active:scale-95 transition-transform">기록 추가</button>
-                                </div>
-                                <div className="mt-6 space-y-2">
-                                    {logs[selectedDate]?.exercises?.length > 0 && <div className="text-xs text-gray-400 font-bold mb-2">오늘의 운동</div>}
-                                    {logs[selectedDate]?.exercises?.map((ex) => (
-                                        <div key={ex.id} className={`flex justify-between items-center p-3 rounded-xl border ${ex.type === 'strength' ? 'bg-purple-50 border-purple-100' : 'bg-orange-50 border-orange-100'}`}>
-                                            <div className="flex items-center">
-                                                <div className={`p-2 rounded-full mr-3 ${ex.type === 'strength' ? 'bg-purple-200 text-purple-700' : 'bg-orange-200 text-orange-700'}`}>
-                                                    {ex.type === 'strength' ? <Icon name="dumbbell" size={16} /> : <span className="text-sm">🏃</span>}
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-gray-800 flex items-center">{ex.name} {ex.weight && <span className="ml-1 text-xs font-normal text-gray-500">({ex.weight}kg)</span>}</div>
-                                                    <div className="text-xs text-gray-500 font-medium">
-                                                        {ex.type === 'strength' ? (ex.duration ? `${ex.duration}초 × ${ex.sets}세트` : `${ex.reps}회 × ${ex.sets}세트`) : `${ex.time}분 / ${ex.distance}km`}
-                                                        {ex.kcal && <span className="ml-2 text-gray-400">🔥 {ex.kcal}kcal</span>}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <button onClick={() => deleteItemFromFirestore(selectedDate, 'exercises', ex.id)} className="text-gray-300 hover:text-red-500 p-2"><Icon name="trash2" /></button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
-                                <h3 className="font-bold text-lg mb-4 flex items-center text-green-600"><Icon name="utensils" className="mr-2" /> 식단</h3>
-                                <div className="mb-4">
-                                    <label className="block w-full h-32 border-2 border-dashed rounded-xl flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">{dietForm.photo ? <img src={dietForm.photo} className="h-full object-contain" /> : <div className="text-center"><Icon name="camera" className="text-gray-400 w-8 h-8 mx-auto mb-1" /><span className="text-xs text-gray-400">사진 찍기</span></div>}<input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} /></label>
-                                    {isAnalyzingImage && <div className="text-center text-xs text-green-600 mt-2 flex items-center justify-center animate-pulse-custom"><Icon name="loader" className="animate-spin mr-1" size={12}/> AI가 음식을 분석 중입니다...</div>}
-                                </div>
-                                <div className="space-y-3">
-                                    <div className="flex gap-2">
-                                        <input type="text" placeholder="메뉴" className="flex-1 p-3 border rounded-lg" value={dietForm.menu} onChange={(e) => setDietForm({...dietForm, menu: e.target.value})} />
-                                        <button onClick={handleSearchCalories} className="px-3 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors" title="칼로리 검색">
-                                            <Icon name="search" />
-                                        </button>
-                                    </div>
-                                    <input type="number" placeholder="칼로리" className="w-full p-3 border rounded-lg" value={dietForm.kcal} onChange={(e) => setDietForm({...dietForm, kcal: e.target.value})} />
-                                    {dietForm.items && dietForm.items.length > 0 && (
-                                        <div className="flex flex-wrap gap-1">
-                                            {dietForm.items.map((item, i) => (
-                                                <span key={i} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">{item}</span>
-                                            ))}
-                                        </div>
-                                    )}
-                                    <button onClick={handleSaveDiet} className="w-full bg-green-600 text-white py-3 rounded-lg font-bold shadow-md active:scale-95 transition-transform">기록 추가</button>
-                                </div>
-                                <div className="mt-6 space-y-2">
-                                    {logs[selectedDate]?.diet?.map(d => (
-                                        <div key={d.id} className="flex justify-between items-center p-3 bg-green-50 border border-green-100 rounded-xl">
-                                            <div className="flex items-center">
-                                                {d.photo && <img src={d.photo} className="w-10 h-10 rounded-lg object-cover mr-3" />}
-                                                <div><div className="font-bold text-gray-800">{d.menu}</div><div className="text-xs text-green-600 font-medium">{d.kcal} kcal</div></div>
-                                            </div>
-                                            <button onClick={() => deleteItemFromFirestore(selectedDate, 'diet', d.id)} className="text-gray-300 hover:text-red-500 p-2"><Icon name="trash2" /></button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-lg mb-4">내 몸 상태 (오늘 기준)</h3>
-                            <div className="grid grid-cols-3 gap-2 mb-4">
-                                <input type="number" placeholder="체중(kg)" className="p-2 border rounded-lg" value={bodyForm.weight} onChange={(e) => setBodyForm({...bodyForm, weight: e.target.value})} />
-                                <input type="number" placeholder="골격근(kg)" className="p-2 border rounded-lg" value={bodyForm.muscle} onChange={(e) => setBodyForm({...bodyForm, muscle: e.target.value})} />
-                                <input type="number" placeholder="혈당" className="p-2 border rounded-lg" value={bodyForm.sugar} onChange={(e) => setBodyForm({...bodyForm, sugar: e.target.value})} />
-                            </div>
-                            <button onClick={handleSaveBodyStats} className="w-full bg-gray-800 text-white py-3 rounded-lg font-bold">상태 저장 및 프로필 업데이트</button>
-                        </div>
-                    </div>
-                );
-            };
-
-            const StatsView = () => { /* ... (이전과 동일) ... */ 
+            const StatsView = () => { /* ... 이전과 동일 ... */ 
                 const now = new Date();
                 const todayStr = new Date(Date.now() + 32400000).toISOString().split('T')[0];
 
@@ -909,13 +909,10 @@
             };
 
             if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50 text-gray-500">로딩 중...</div>;
-            
-            // [NEW] 로그인 안 했으면 IntroView 먼저 보여주고, Start 누르면 LoginPage 보여줌
             if (!user) {
                 if (showIntro) return <IntroView onFinish={() => setShowIntro(false)} />;
                 return <LoginPage onLogin={handleGoogleLogin} error={loginError} />;
             }
-            // 로그인 했어도 프로필 없으면 OnboardingPage
             if (!profile) return <OnboardingPage onSave={handleOnboardingComplete} />;
 
             return (

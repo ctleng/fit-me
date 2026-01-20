@@ -1232,17 +1232,20 @@
 
                 return (
                     <div className="flex flex-col h-full animate-fade-in">
-                        {/* 오늘 날짜 표시 */}
+                        {/* 선택된 날짜 표시 */}
                         <div className="mb-3 text-center">
                             <p className="text-lg font-bold text-blue-600 flex items-center justify-center">
                                 <Icon name="calendar" size={20} className="mr-2" />
-                                오늘 {new Date().getMonth() + 1}월 {new Date().getDate()}일 ({['일', '월', '화', '수', '목', '금', '토'][new Date().getDay()]})
+                                {selectedDate === new Date().toISOString().split('T')[0] 
+                                    ? `오늘 ${new Date().getMonth() + 1}월 ${new Date().getDate()}일 (${['일', '월', '화', '수', '목', '금', '토'][new Date().getDay()]})` 
+                                    : `${selectedDate.split('-')[1]}월 ${selectedDate.split('-')[2]}일 선택됨`
+                                }
                             </p>
                         </div>
 
-                        {/* 대시보드 링 */}
+                        {/* 대시보드 링 - 클릭시 상세 페이지로 */}
                         <div className="grid grid-cols-2 gap-4 mb-6">
-                             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setCalendarViewMode('detail')}>
+                             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:shadow-md transition-all relative group" onClick={() => setCalendarViewMode('detail')}>
                                 <h3 className="text-xs font-bold text-gray-400 mb-2">{selectedDate.slice(5).replace('-','/')} 식단</h3>
                                 <ProgressRing 
                                     radius={50} 
@@ -1253,10 +1256,18 @@
                                     label={remainingDiet >= 0 ? `${remainingDiet}` : `${Math.abs(remainingDiet)}`} 
                                     subLabel={remainingDiet >= 0 ? "kcal 남음" : "kcal 초과!"} 
                                 />
+                                {/* 호버시 힌트 */}
+                                <div className="absolute bottom-2 text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    🔍 클릭해서 상세보기
+                                </div>
                             </div>
-                            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => { setActiveTab('stats'); setPeriod('week'); }}>
+                            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:shadow-md transition-all relative group" onClick={() => setCalendarViewMode('detail')}>
                                 <h3 className="text-xs font-bold text-gray-400 mb-2">주간 운동 달성</h3>
                                 <ProgressRing radius={50} stroke={8} progress={weeklyBurned} max={workoutGoal} color="blue" label={`${Math.min(Math.round((weeklyBurned/workoutGoal)*100), 999)}%`} subLabel={`${weeklyBurned} kcal`} />
+                                {/* 호버시 힌트 */}
+                                <div className="absolute bottom-2 text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    🔍 클릭해서 상세보기
+                                </div>
                             </div>
                         </div>
 
@@ -1286,7 +1297,7 @@
                                         key={day} 
                                         onClick={() => {
                                             setSelectedDate(dStr);
-                                            setCalendarViewMode('detail'); // 바로 상세 페이지로
+                                            // 링 데이터만 업데이트 (상세 페이지로 가지 않음)
                                         }} 
                                         className={`h-14 sm:h-20 border rounded-lg flex flex-col items-center justify-start pt-1 cursor-pointer transition-all hover:bg-blue-50 ${dStr === selectedDate ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 bg-white'}`}
                                     >

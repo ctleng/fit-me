@@ -45,13 +45,13 @@
         // [중요] 여기에 본인의 Firebase 키를 입력하세요!
         // ===========================================================
         const myFirebaseConfig = {
-  apiKey: "AIzaSyA7aW0QCktGF8qBmLaaMuHXfr8gNkEOvO8",
-  authDomain: "fitme-89d4d.firebaseapp.com",
-  projectId: "fitme-89d4d",
-  storageBucket: "fitme-89d4d.firebasestorage.app",
-  messagingSenderId: "512104272869",
-  appId: "1:512104272869:web:ef13a0168f299904d4d50c",
-  measurementId: "G-MDVJ39NKBV"
+  apiKey: "AIzaSyA7aW0QCktGF8qBmLaaMuHXfr8gNkEOvO8",
+  authDomain: "fitme-89d4d.firebaseapp.com",
+  projectId: "fitme-89d4d",
+  storageBucket: "fitme-89d4d.firebasestorage.app",
+  messagingSenderId: "512104272869",
+  appId: "1:512104272869:web:ef13a0168f299904d4d50c",
+  measurementId: "G-MDVJ39NKBV"
         };
         // ===========================================================
 
@@ -121,7 +121,6 @@
             const { initializeApp, getAuth, getFirestore, initializeFirestore, memoryLocalCache } = window.firebaseApp;
             app = initializeApp(configToUse);
             auth = getAuth(app);
-            // 충돌 방지를 위해 메모리 캐시 모드로 초기화
             db = initializeFirestore(app, { localCache: memoryLocalCache() });
             appId = configToUse.projectId || 'default-app';
         } catch (e) {
@@ -144,7 +143,6 @@
                 dumbbell: <path d="M6.5 6.5l11 11M21 21l-1-1M3 3l1 1M18 22l4-4M2 6l4-4M3 21l4.1-4.1M15.7 15.7l-7.4-7.4" />,
                 bot: <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />,
                 send: <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />,
-                // [수정] 모든 복합 아이콘을 <g> 태그로 감싸서 안전하게 변경
                 edit: <g><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></g>,
                 user: <g><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></g>,
                 utensils: <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />,
@@ -161,7 +159,6 @@
             return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>;
         };
 
-        // --- 원형 차트 (더블 링 대시보드용) ---
         const ProgressRing = ({ radius, stroke, progress, color, label, subLabel, max, onClick, overrideStrokeColor }) => {
             const normalizedRadius = radius - stroke * 2;
             const circumference = normalizedRadius * 2 * Math.PI;
@@ -199,7 +196,6 @@
             );
         };
 
-        // --- [신규] 인트로 캐러셀 (앱 소개) ---
         const IntroView = ({ onFinish }) => {
             const [slide, setSlide] = useState(0);
             const slides = [
@@ -238,7 +234,6 @@
             );
         };
 
-        // --- 로그인 화면 ---
         const LoginPage = ({ onLogin, error }) => (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 animate-fade-in">
                 <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center">
@@ -260,7 +255,6 @@
             </div>
         );
 
-        // --- 온보딩 화면 (정보 + 목표 설정) ---
         const OnboardingPage = ({ onSave }) => {
             const [step, setStep] = useState(1);
             const [form, setForm] = useState({ nickname: '', weight: '', height: '', muscle: '', age: '', gender: 'male', activityLevel: 'moderate' });
@@ -512,7 +506,6 @@
                             setShowIntro(false);
                             const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'data', 'profile');
                             const docSnap = await getDoc(docRef);
-                            // [FIX] 프로필은 있지만 키 정보가 없으면 온보딩 다시 띄우기
                             const data = docSnap.data();
                             if (docSnap.exists() && data.height) { setProfile(data); } else { setProfile(null); }
                         }
@@ -697,7 +690,171 @@
             const getDaysInMonth = (d) => { const y = d.getFullYear(), m = d.getMonth(); return { days: new Date(y, m + 1, 0).getDate(), firstDay: new Date(y, m, 1).getDay(), year: y, month: m }; };
             const changeMonth = (off) => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + off, 1));
 
-            // --- 캘린더 뷰 ---
+            // ========== [추가] RecordView 함수 ==========
+            const RecordView = () => {
+                const dayLog = logs[selectedDate];
+                
+                return (
+                    <div className="flex flex-col h-full overflow-y-auto pb-20 no-scrollbar animate-fade-in">
+                        <div className="mb-4">
+                            <div className="flex bg-gray-200 rounded-lg p-1 font-bold">
+                                {['운동', '식단', '신체'].map((label, i) => {
+                                    const val = ['exercise', 'diet', 'body'][i];
+                                    return (
+                                        <button key={val} onClick={() => setRecordSubTab(val)} className={`flex-1 px-4 py-2 rounded-md transition-all ${recordSubTab === val ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}>{label}</button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* 운동 탭 */}
+                        {recordSubTab === 'exercise' && (
+                            <div className="space-y-4">
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                                    <h3 className="font-bold text-lg mb-4 flex items-center text-blue-600"><Icon name="dumbbell" className="mr-2" /> 운동 기록</h3>
+                                    
+                                    <div className="mb-4">
+                                        <div className="flex gap-2 mb-3">
+                                            <button onClick={() => setExerciseForm({...exerciseForm, type: 'strength'})} className={`flex-1 py-2 rounded-lg font-bold border ${exerciseForm.type === 'strength' ? 'bg-purple-500 text-white' : 'bg-gray-50 text-gray-600'}`}>근력</button>
+                                            <button onClick={() => setExerciseForm({...exerciseForm, type: 'cardio'})} className={`flex-1 py-2 rounded-lg font-bold border ${exerciseForm.type === 'cardio' ? 'bg-orange-500 text-white' : 'bg-gray-50 text-gray-600'}`}>유산소</button>
+                                        </div>
+                                        
+                                        <input 
+                                            type="text" 
+                                            className="w-full p-3 border rounded-lg mb-2" 
+                                            placeholder="운동 종목 (예: 스쿼트, 러닝)" 
+                                            value={exerciseForm.name} 
+                                            onChange={e => setExerciseForm({...exerciseForm, name: e.target.value})} 
+                                            list="exercise-suggestions"
+                                        />
+                                        <datalist id="exercise-suggestions">
+                                            {POPULAR_EXERCISES.map(ex => <option key={ex} value={ex} />)}
+                                        </datalist>
+                                        
+                                        {exerciseForm.type === 'strength' && (
+                                            isTimeBasedExercise(exerciseForm.name) ? (
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <input type="number" className="w-full p-3 border rounded-lg" placeholder="초" value={exerciseForm.duration} onChange={e => setExerciseForm({...exerciseForm, duration: e.target.value})} />
+                                                    <input type="number" className="w-full p-3 border rounded-lg" placeholder="세트" value={exerciseForm.sets} onChange={e => setExerciseForm({...exerciseForm, sets: e.target.value})} />
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <input type="number" className="w-full p-3 border rounded-lg" placeholder="무게(kg)" value={exerciseForm.weight} onChange={e => setExerciseForm({...exerciseForm, weight: e.target.value})} />
+                                                    <input type="number" className="w-full p-3 border rounded-lg" placeholder="횟수" value={exerciseForm.reps} onChange={e => setExerciseForm({...exerciseForm, reps: e.target.value})} />
+                                                    <input type="number" className="w-full p-3 border rounded-lg" placeholder="세트" value={exerciseForm.sets} onChange={e => setExerciseForm({...exerciseForm, sets: e.target.value})} />
+                                                </div>
+                                            )
+                                        )}
+                                        
+                                        {exerciseForm.type === 'cardio' && (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <input type="number" className="w-full p-3 border rounded-lg" placeholder="시간(분)" value={exerciseForm.time} onChange={e => setExerciseForm({...exerciseForm, time: e.target.value})} />
+                                                <input type="number" className="w-full p-3 border rounded-lg" placeholder="거리(km)" value={exerciseForm.distance} onChange={e => setExerciseForm({...exerciseForm, distance: e.target.value})} />
+                                            </div>
+                                        )}
+                                        
+                                        <button onClick={handleSaveExercise} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mt-3 shadow-md active:scale-95 transition-transform flex items-center justify-center"><Icon name="save" className="mr-2" /> 기록하기</button>
+                                    </div>
+                                    
+                                    {dayLog?.exercises?.length > 0 && (
+                                        <div className="space-y-2 pt-4 border-t">
+                                            <h4 className="font-bold text-sm text-gray-500 mb-2">오늘의 운동</h4>
+                                            {dayLog.exercises.map((ex, idx) => (
+                                                <div key={idx} className={`p-3 rounded-lg border flex justify-between items-center ${ex.type === 'strength' ? 'bg-purple-50 border-purple-100' : 'bg-orange-50 border-orange-100'}`}>
+                                                    <div>
+                                                        <div className="font-bold text-gray-800">{ex.name}</div>
+                                                        <div className="text-sm text-gray-600">{ex.type === 'strength' ? (ex.duration ? `${ex.duration}초 × ${ex.sets}세트` : `${ex.weight || 0}kg / ${ex.reps}회 × ${ex.sets}세트`) : `${ex.time}분 / ${ex.distance}km`}</div>
+                                                        <div className="text-xs text-gray-500 font-bold">{ex.kcal ? `${ex.kcal} kcal` : ''}</div>
+                                                    </div>
+                                                    <button onClick={() => deleteItemFromFirestore(selectedDate, 'exercises', ex.id)} className="text-red-500 p-2"><Icon name="trash2" size={18} /></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 식단 탭 */}
+                        {recordSubTab === 'diet' && (
+                            <div className="space-y-4">
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                                    <h3 className="font-bold text-lg mb-4 flex items-center text-green-600"><Icon name="utensils" className="mr-2" /> 식단 기록</h3>
+                                    
+                                    <select className="w-full p-3 border rounded-lg mb-2" value={dietForm.mealTime} onChange={e => setDietForm({...dietForm, mealTime: e.target.value})}>
+                                        <option value="breakfast">아침</option>
+                                        <option value="lunch">점심</option>
+                                        <option value="dinner">저녁</option>
+                                        <option value="snack">간식</option>
+                                    </select>
+                                    
+                                    <input type="text" className="w-full p-3 border rounded-lg mb-2" placeholder="메뉴 이름" value={dietForm.menu} onChange={e => setDietForm({...dietForm, menu: e.target.value})} />
+                                    
+                                    <div className="flex gap-2 mb-2">
+                                        <input type="number" className="flex-1 p-3 border rounded-lg" placeholder="칼로리 (kcal)" value={dietForm.kcal} onChange={e => setDietForm({...dietForm, kcal: e.target.value})} />
+                                        <button onClick={handleSearchCalories} disabled={isAnalyzingImage} className="px-4 py-3 bg-gray-100 border rounded-lg font-bold text-sm text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center"><Icon name="search" size={16} className="mr-1" /> 검색</button>
+                                    </div>
+                                    
+                                    <div className="mb-3">
+                                        <label className="flex items-center justify-center w-full p-4 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">
+                                            <Icon name="camera" className="mr-2 text-gray-400" />
+                                            <span className="text-sm text-gray-600 font-medium">{isAnalyzingImage ? "분석 중..." : (dietForm.photo ? "사진 변경" : "사진으로 분석")}</span>
+                                            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={isAnalyzingImage} />
+                                        </label>
+                                        {dietForm.photo && <img src={dietForm.photo} className="w-full h-32 object-cover rounded-lg mt-2" />}
+                                    </div>
+                                    
+                                    <button onClick={handleSaveDiet} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform flex items-center justify-center"><Icon name="save" className="mr-2" /> 기록하기</button>
+                                    
+                                    {dayLog?.diet?.length > 0 && (
+                                        <div className="space-y-2 pt-4 border-t mt-4">
+                                            <h4 className="font-bold text-sm text-gray-500 mb-2">오늘의 식단</h4>
+                                            {dayLog.diet.map((d, idx) => (
+                                                <div key={idx} className="flex p-3 bg-green-50 border border-green-100 rounded-lg justify-between items-center">
+                                                    <div className="flex items-center flex-1">
+                                                        {d.photo && <img src={d.photo} className="w-12 h-12 rounded-lg object-cover mr-3" />}
+                                                        <div className="flex-1">
+                                                            <div className="font-bold text-gray-800">{d.menu}</div>
+                                                            <div className="text-xs text-green-600 font-medium">{d.mealTime} • {d.kcal} kcal</div>
+                                                            {d.items && d.items.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                                    {d.items.map((item, i) => (
+                                                                        <span key={i} className="text-[10px] bg-white text-green-700 px-1.5 py-0.5 rounded border border-green-100">{item}</span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <button onClick={() => deleteItemFromFirestore(selectedDate, 'diet', d.id)} className="text-red-500 p-2 ml-2"><Icon name="trash2" size={18} /></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 신체 탭 */}
+                        {recordSubTab === 'body' && (
+                            <div className="space-y-4">
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                                    <h3 className="font-bold text-lg mb-4 flex items-center text-gray-700"><Icon name="activity" className="mr-2" /> 신체 정보</h3>
+                                    
+                                    <div className="grid grid-cols-2 gap-3 mb-4">
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">체중 (kg)</label><input type="number" className="w-full p-3 border rounded-lg" value={bodyForm.weight} onChange={e => setBodyForm({...bodyForm, weight: e.target.value})} /></div>
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">골격근 (kg)</label><input type="number" className="w-full p-3 border rounded-lg" value={bodyForm.muscle} onChange={e => setBodyForm({...bodyForm, muscle: e.target.value})} /></div>
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">체지방률 (%)</label><input type="number" className="w-full p-3 border rounded-lg" value={bodyForm.fat} onChange={e => setBodyForm({...bodyForm, fat: e.target.value})} /></div>
+                                        <div><label className="block text-xs font-bold text-gray-500 mb-1">혈당</label><input type="number" className="w-full p-3 border rounded-lg" value={bodyForm.sugar} onChange={e => setBodyForm({...bodyForm, sugar: e.target.value})} /></div>
+                                    </div>
+                                    
+                                    <button onClick={handleSaveBodyStats} className="w-full bg-gray-700 text-white py-3 rounded-xl font-bold shadow-md active:scale-95 transition-transform flex items-center justify-center"><Icon name="save" className="mr-2" /> 저장하기</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
             const CalendarView = () => {
                 const { days, firstDay, year, month } = getDaysInMonth(currentMonth);
                 const dayLog = logs[selectedDate];
@@ -732,7 +889,6 @@
                                                     <div className="text-xs text-green-600 font-medium">{d.mealTime} • {d.kcal} kcal</div>
                                                 </div>
                                             </div>
-                                            {/* 인식된 아이템 리스트 표시 */}
                                             {d.items && d.items.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-2">
                                                     {d.items.map((item, i) => (
@@ -756,7 +912,6 @@
                     );
                 }
 
-                // [NEW] 대시보드 계산 로직 (선택된 날짜 기준)
                 const currentSelectedDate = new Date(selectedDate);
                 const dayIntake = dayLog?.diet?.reduce((sum, d) => sum + (parseInt(d.kcal) || 0), 0) || 0;
                 
@@ -772,23 +927,20 @@
                     }
                 });
                 
-                // 일일 운동량 (캘린더 아이콘용)
                 const dayBurned = dayLog?.exercises?.reduce((sum, ex) => sum + (ex.kcal || 0), 0) || 0;
 
                 const dietGoal = profile?.dailyDietGoal || 2000;
                 const workoutGoal = profile?.weeklyWorkoutGoal || 2000;
-                const dailyWorkoutGoal = Math.round(workoutGoal / 7); // 일일 운동 목표
+                const dailyWorkoutGoal = Math.round(workoutGoal / 7);
                 const remainingDiet = dietGoal - dayIntake;
                 
-                // [NEW] 신호등 로직 (70% Rule)
                 const dietRatio = dietGoal > 0 ? dayIntake / dietGoal : 0;
-                let dietStrokeColor = '#10B981'; // Green
-                if (dayIntake > dietGoal) dietStrokeColor = '#EF4444'; // Red
-                else if (dietRatio >= 0.7) dietStrokeColor = '#F59E0B'; // Orange
+                let dietStrokeColor = '#10B981';
+                if (dayIntake > dietGoal) dietStrokeColor = '#EF4444';
+                else if (dietRatio >= 0.7) dietStrokeColor = '#F59E0B';
 
                 return (
                     <div className="flex flex-col h-full animate-fade-in">
-                        {/* [NEW] 대시보드 링 */}
                         <div className="grid grid-cols-2 gap-4 mb-6 mt-2">
                              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setCalendarViewMode('detail')}>
                                 <h3 className="text-xs font-bold text-gray-400 mb-2">{selectedDate.slice(5).replace('-','/')} 식단</h3>
@@ -808,7 +960,6 @@
                             </div>
                         </div>
 
-                        {/* 기존 캘린더 (아이콘 시각화 적용) */}
                         <div className="flex justify-between items-center mb-4 px-2">
                             <button onClick={() => changeMonth(-1)} className="p-2"><Icon name="chevronLeft" /></button>
                             <h2 className="text-xl font-bold">{year}년 {month + 1}월</h2>
@@ -823,7 +974,6 @@
                                 const dBurned = dayData?.exercises?.reduce((sum, ex) => sum + (ex.kcal || 0), 0) || 0;
                                 const dIntake = dayData?.diet?.reduce((sum, d) => sum + (parseInt(d.kcal) || 0), 0) || 0;
                                 
-                                // 아이콘 결정 로직
                                 const showFire = dBurned > 0;
                                 const fireIcon = dBurned >= dailyWorkoutGoal ? <Icon name="fire" size={14} className="text-red-500" /> : <span className="text-xs">🕯️</span>;
                                 
@@ -835,7 +985,6 @@
                                         key={day} 
                                         onClick={() => {
                                             setSelectedDate(dStr);
-                                            // 날짜 클릭 시 대시보드만 업데이트
                                         }} 
                                         className={`h-14 sm:h-20 border rounded-lg flex flex-col items-center justify-start pt-1 cursor-pointer transition-all hover:bg-blue-50 ${dStr === selectedDate ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 bg-white'}`}
                                     >
@@ -882,7 +1031,6 @@
 
                 const chartData = Object.keys(logs).sort().map(d => ({ date: d, weight: logs[d].body?.weight })).filter(d => d.weight);
 
-                // [NEW] 목표 달성 프로그레스 바
                 const currentWeight = parseFloat(chartData[chartData.length-1]?.weight || profile?.weight);
                 const targetWeight = parseFloat(profile?.targetWeight || currentWeight - 5);
                 const startWeight = parseFloat(profile?.weight || currentWeight + 5);
@@ -904,7 +1052,6 @@
                             </div>
                         </div>
 
-                        {/* [NEW] 목표 달성 현황 카드 */}
                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
                             <div className="flex justify-between items-center mb-2">
                                 <span className="text-sm font-bold text-gray-600">목표 달성까지</span>

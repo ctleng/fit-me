@@ -843,6 +843,7 @@
             const [dietForm, setDietForm] = useState({ id: null, mealTime: 'lunch', menu: '', kcal: '', photo: null, items: [] });
             const [bodyForm, setBodyForm] = useState({ weight: '', muscle: '', fat: '', sugar: '' });
             const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+            const [returnToDetail, setReturnToDetail] = useState(false);
 
             const isTimeBasedExercise = (name) => {
                 for (const key in EXERCISE_DATA) {
@@ -962,8 +963,30 @@
             const RecordView = () => {
                 const dayLog = logs[selectedDate];
                 
+                const handleBackFromRecord = () => {
+                    if (returnToDetail) {
+                        setActiveTab('calendar');
+                        setCalendarViewMode('detail');
+                        setReturnToDetail(false);
+                    } else {
+                        setActiveTab('calendar');
+                    }
+                };
+                
                 return (
                     <div className="flex flex-col h-full overflow-y-auto pb-20 no-scrollbar animate-fade-in">
+                        {/* 상단 날짜 및 뒤로가기 */}
+                        <div className="flex items-center mb-4">
+                            <button onClick={handleBackFromRecord} className="p-2 hover:bg-gray-200 rounded-full mr-2">
+                                <Icon name="chevronLeft" />
+                            </button>
+                            <h2 className="text-lg font-bold text-gray-700 flex items-center">
+                                <Icon name="calendar" size={18} className="mr-2 text-blue-600" />
+                                {selectedDate} 기록
+                            </h2>
+                        </div>
+
+                        {/* 탭 메뉴 */}
                         <div className="mb-4">
                             <div className="flex bg-gray-200 rounded-lg p-1 font-bold">
                                 {['운동', '식단', '신체'].map((label, i) => {
@@ -1143,7 +1166,7 @@
                                             <div className="text-sm text-gray-600">{ex.type === 'strength' ? (ex.duration ? `${ex.duration}초 × ${ex.sets}세트` : `${ex.weight || 0}kg / ${ex.reps}회 × ${ex.sets}세트`) : `${ex.time}분 / ${ex.distance}km`}</div>
                                         </div>
                                     ))}</div>
-                                ) : (<div className="text-center py-6"><p className="text-gray-400 mb-3">기록된 운동이 없습니다.</p><button onClick={() => { setActiveTab('record'); setCalendarViewMode('month'); }} className="text-blue-600 font-bold text-sm px-4 py-2 bg-blue-50 rounded-lg">운동 기록하러 가기</button></div>)}
+                                ) : (<div className="text-center py-6"><p className="text-gray-400 mb-3">기록된 운동이 없습니다.</p><button onClick={() => { setActiveTab('record'); setRecordSubTab('exercise'); setReturnToDetail(true); setCalendarViewMode('month'); }} className="text-blue-600 font-bold text-sm px-4 py-2 bg-blue-50 rounded-lg">운동 기록하러 가기</button></div>)}
                             </div>
                             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4">
                                 <h3 className="font-bold text-lg mb-3 flex items-center text-green-600"><Icon name="utensils" className="mr-2" /> 식단 기록</h3>
@@ -1166,7 +1189,7 @@
                                             )}
                                         </div>
                                     ))}</div>
-                                ) : (<div className="text-center py-6"><p className="text-gray-400 mb-3">기록된 식단이 없습니다.</p><button onClick={() => { setActiveTab('record'); setRecordSubTab('diet'); setCalendarViewMode('month'); }} className="text-green-600 font-bold text-sm px-4 py-2 bg-green-50 rounded-lg">식단 기록하러 가기</button></div>)}
+                                ) : (<div className="text-center py-6"><p className="text-gray-400 mb-3">기록된 식단이 없습니다.</p><button onClick={() => { setActiveTab('record'); setRecordSubTab('diet'); setReturnToDetail(true); setCalendarViewMode('month'); }} className="text-green-600 font-bold text-sm px-4 py-2 bg-green-50 rounded-lg">식단 기록하러 가기</button></div>)}
                             </div>
                              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                                 <h3 className="font-bold text-lg mb-3 flex items-center text-gray-700"><Icon name="activity" className="mr-2" /> 신체 정보</h3>
@@ -1200,7 +1223,7 @@
                 const dietGoal = profile?.dailyDietGoal || 2000;
                 const workoutGoal = profile?.weeklyWorkoutGoal || 2000;
                 const dailyWorkoutGoal = Math.round(workoutGoal / 7);
-                const remainingDiet = dietGoal - dayIntake;
+                const remainingDiet = Math.ceil(dietGoal - dayIntake);
                 
                 const dietRatio = dietGoal > 0 ? dayIntake / dietGoal : 0;
                 let dietStrokeColor = '#10B981';
@@ -1404,7 +1427,7 @@
                         {/* FAB - Floating Action Button */}
                         {activeTab === 'calendar' && (
                             <button 
-                                onClick={() => setActiveTab('record')} 
+                                onClick={() => { setActiveTab('record'); setReturnToDetail(false); }} 
                                 className="absolute bottom-24 right-8 w-14 h-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all z-30"
                                 style={{ boxShadow: '0 4px 20px rgba(59, 130, 246, 0.4)' }}
                             >
@@ -1414,7 +1437,7 @@
                     </main>
                     <nav className="bg-white border-t flex justify-around items-center h-16 pb-safe z-20 pt-3">
                         <button onClick={() => { setActiveTab('calendar'); setCalendarViewMode('month'); }} className={`flex flex-col items-center w-full h-full ${activeTab === 'calendar' ? 'text-blue-600' : 'text-gray-400'}`}><Icon name="home" /><span className="text-xs">Home</span></button>
-                        <button onClick={() => setActiveTab('record')} className={`flex flex-col items-center w-full h-full ${activeTab === 'record' ? 'text-blue-600' : 'text-gray-400'}`}><Icon name="plus" /><span className="text-xs">기록</span></button>
+                        <button onClick={() => { setActiveTab('record'); setReturnToDetail(false); }} className={`flex flex-col items-center w-full h-full ${activeTab === 'record' ? 'text-blue-600' : 'text-gray-400'}`}><Icon name="plus" /><span className="text-xs">기록</span></button>
                         <button onClick={() => setActiveTab('stats')} className={`flex flex-col items-center w-full h-full ${activeTab === 'stats' ? 'text-blue-600' : 'text-gray-400'}`}><Icon name="trendingUp" /><span className="text-xs">성과</span></button>
                         <button onClick={() => setActiveTab('my')} className={`flex flex-col items-center w-full h-full ${activeTab === 'my' ? 'text-indigo-600' : 'text-gray-400'}`}><Icon name="user" /><span className="text-xs">My</span></button>
                     </nav>

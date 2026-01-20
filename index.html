@@ -414,7 +414,7 @@
             );
         };
 
-        const MyView = ({ user, handleLogout, deleteAccount }) => {
+        const MyView = ({ user, handleLogout, deleteAccount, profile }) => {
             const [viewMode, setViewMode] = useState('main'); 
             const [withdrawReason, setWithdrawReason] = useState('');
             const [customReason, setCustomReason] = useState('');
@@ -424,6 +424,34 @@
                 const reason = withdrawReason === '기타' ? customReason : withdrawReason;
                 deleteAccount(reason);
             };
+
+            // 목표 난이도 계산 (OnboardingPage와 동일)
+            const calculateGoalDifficulty = () => {
+                if (!profile) return null;
+                const current = parseFloat(profile.weight);
+                const target = parseFloat(profile.targetWeight);
+                if (!current || !target || !profile.duration) return null;
+                if (target >= current) return { label: '증량/유지', msg: "건강한 증량/유지 목표네요! 근력 운동 위주로 추천해드릴게요.", color: "text-blue-600 bg-blue-50" };
+                const loss = current - target;
+                const weeks = profile.duration * 4.3;
+                const weeklyLoss = loss / weeks;
+                if (weeklyLoss < 0.5) return { label: 'EASY', msg: "충분히 가능해요! 🍵\n천천히 건강하게 빠지는 속도입니다.", color: "text-green-600 bg-green-50" };
+                if (weeklyLoss <= 0.8) return { label: 'NORMAL', msg: "가장 이상적인 목표예요! 👍\n표준적인 속도입니다. 꾸준함이 답!", color: "text-blue-600 bg-blue-50" };
+                if (weeklyLoss <= 1.2) return { label: 'HARD', msg: "조금 타이트한 도전이에요! 🔥\n식단 관리가 꽤 중요합니다.", color: "text-orange-600 bg-orange-50" };
+                return { label: 'EXTREME', msg: "건강에 무리가 될 수 있어요 🚨\n기간을 더 늘리시는 걸 추천해요.", color: "text-red-600 bg-red-50" };
+            };
+
+            // 남은 기간 계산
+            const getDaysRemaining = () => {
+                if (!profile?.targetDate) return 0;
+                const target = new Date(profile.targetDate);
+                const today = new Date();
+                const diff = Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+                return Math.max(0, diff);
+            };
+
+            const goalDifficulty = calculateGoalDifficulty();
+            const daysRemaining = getDaysRemaining();
 
             if (viewMode === 'contact') {
                 return (
@@ -462,12 +490,62 @@
             }
 
             return (
-                <div className="h-full flex flex-col p-4 animate-fade-in">
+                <div className="h-full flex flex-col p-4 animate-fade-in overflow-y-auto pb-20 no-scrollbar">
                     <h2 className="text-xl font-bold mb-6">My 설정</h2>
+                    
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4 flex items-center">
                         <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 mr-4"><Icon name="user" size={32} /></div>
                         <div><p className="text-xs text-gray-400 font-bold mb-1">로그인 계정</p><p className="text-gray-800 font-medium break-all">{user?.email || '이메일 정보 없음'}</p></div>
                     </div>
+
+                    {/* 나의 목표 카드 */}
+                    {profile && (
+                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-sm border border-blue-100 p-6 mb-4">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                                <span className="text-2xl mr-2">🎯</span> 나의 목표
+                            </h3>
+                            
+                            <div className="bg-white rounded-xl p-4 mb-3">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm text-gray-500 font-medium">목표 체중</span>
+                                    <span className="text-lg font-bold text-blue-600">{profile.weight}kg → {profile.targetWeight}kg</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-500 font-medium">달성 기간</span>
+                                    <span className="text-sm font-bold text-gray-700">{profile.duration}개월 ({profile.targetDate ? new Date(profile.targetDate).toLocaleDateString('ko-KR') : '-'}까지)</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl p-4 mb-3">
+                                <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center">
+                                    <span className="mr-1">💪</span> 현재 진행 상황
+                                </h4>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-gray-500">현재 체중</span>
+                                        <span className="text-sm font-bold text-gray-800">{profile.weight}kg {profile.targetWeight < profile.weight ? `(-${(parseFloat(profile.weight) - parseFloat(profile.weight)).toFixed(1)}kg)` : ''}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-gray-500">남은 기간</span>
+                                        <span className="text-sm font-bold text-gray-800">{daysRemaining}일</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {goalDifficulty && (
+                                <div className={`rounded-xl p-4 border ${goalDifficulty.color} bg-opacity-10 border-opacity-20`}>
+                                    <div className="flex items-start">
+                                        <span className="text-lg mr-2">📝</span>
+                                        <div className="flex-1">
+                                            <p className="font-bold text-sm mb-1">{goalDifficulty.label}</p>
+                                            <p className="text-xs whitespace-pre-line leading-relaxed opacity-90">{goalDifficulty.msg}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
                     <div className="space-y-3">
                         <button onClick={() => setViewMode('contact')} className="w-full bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between hover:bg-gray-50 transition-colors">
                             <div className="flex items-center"><div className="p-2 bg-blue-50 text-blue-600 rounded-lg mr-3"><Icon name="mail" /></div><span className="font-medium text-gray-700">문의하기 / 개선 제안</span></div><Icon name="chevronRight" className="text-gray-400" />
@@ -985,6 +1063,7 @@
                                         key={day} 
                                         onClick={() => {
                                             setSelectedDate(dStr);
+                                            setCalendarViewMode('detail'); // 바로 상세 페이지로
                                         }} 
                                         className={`h-14 sm:h-20 border rounded-lg flex flex-col items-center justify-start pt-1 cursor-pointer transition-all hover:bg-blue-50 ${dStr === selectedDate ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 bg-white'}`}
                                     >
@@ -998,9 +1077,19 @@
                             })}
                         </div>
                         <div className="mt-4 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-                             <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-gray-800">{selectedDate} 요약</h3></div>
-                             <div className="text-center py-2 text-gray-400 text-sm">위쪽 링을 눌러 상세 정보를 확인하세요 👆</div>
-                            <button onClick={() => setActiveTab('record')} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold flex justify-center items-center shadow-md active:scale-95 transition-transform"><Icon name="plus" className="w-5 h-5 mr-2" /> 기록하러 가기</button>
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-bold text-gray-800 flex items-center">
+                                    <span className="text-lg mr-2">📅</span>
+                                    {selectedDate}
+                                </h3>
+                            </div>
+                            <p className="text-sm text-gray-500 text-center mb-4 leading-relaxed">
+                                날짜를 클릭하면 해당일의<br/>
+                                운동·식단·신체 기록을 볼 수 있어요
+                            </p>
+                            <button onClick={() => setActiveTab('record')} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold flex justify-center items-center shadow-md active:scale-95 transition-transform">
+                                <Icon name="plus" className="w-5 h-5 mr-2" /> 기록하러 가기
+                            </button>
                         </div>
                     </div>
                 );
@@ -1125,7 +1214,7 @@
                         {activeTab === 'calendar' && CalendarView()}
                         {activeTab === 'record' && RecordView()}
                         {activeTab === 'stats' && StatsView()}
-                        {activeTab === 'my' && <MyView user={user} handleLogout={handleLogout} deleteAccount={handleDeleteAccount} />}
+                        {activeTab === 'my' && <MyView user={user} handleLogout={handleLogout} deleteAccount={handleDeleteAccount} profile={profile} />}
                     </main>
                     <nav className="bg-white border-t flex justify-around items-center h-16 pb-safe z-20">
                         <button onClick={() => { setActiveTab('calendar'); setCalendarViewMode('month'); }} className={`flex flex-col items-center w-full h-full ${activeTab === 'calendar' ? 'text-blue-600' : 'text-gray-400'}`}><Icon name="home" /><span className="text-xs">Home</span></button>

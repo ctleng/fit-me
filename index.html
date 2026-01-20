@@ -258,7 +258,7 @@
         const OnboardingPage = ({ onSave }) => {
             const [step, setStep] = useState(1);
             const [form, setForm] = useState({ nickname: '', weight: '', height: '', muscle: '', age: '', gender: 'male', activityLevel: 'moderate' });
-            const [goal, setGoal] = useState({ targetWeight: '', duration: 3 });
+            const [goal, setGoal] = useState({ targetWeight: '', duration: 3, durationUnit: 'month' });
 
             const handleNext = () => {
                 if (!form.nickname || !form.weight || !form.height) return alert('기본 정보를 모두 입력해주세요.');
@@ -271,7 +271,8 @@
                 if (!current || !target || !goal.duration) return null;
                 if (target >= current) return { label: '증량/유지', msg: "건강한 증량/유지 목표네요! 근력 운동 위주로 추천해드릴게요.", color: "text-blue-600 bg-blue-50" };
                 const loss = current - target;
-                const weeks = goal.duration * 4.3;
+                // 주 단위로 통일
+                const weeks = goal.durationUnit === 'week' ? goal.duration : goal.duration * 4.3;
                 const weeklyLoss = loss / weeks;
                 if (weeklyLoss < 0.5) return { label: 'EASY', msg: "충분히 가능해요! 🍵\n천천히 건강하게 빠지는 속도입니다.", color: "text-green-600 bg-green-50" };
                 if (weeklyLoss <= 0.8) return { label: 'NORMAL', msg: "가장 이상적인 목표예요! 👍\n표준적인 속도입니다. 꾸준함이 답!", color: "text-blue-600 bg-blue-50" };
@@ -282,13 +283,18 @@
             const handleSubmit = () => {
                 if (!goal.targetWeight) return alert('목표 체중을 입력해주세요.');
                 const targetDate = new Date();
-                targetDate.setMonth(targetDate.getMonth() + goal.duration);
+                // 주 단위면 일수로 변환, 개월 단위면 월수로 변환
+                if (goal.durationUnit === 'week') {
+                    targetDate.setDate(targetDate.getDate() + (goal.duration * 7));
+                } else {
+                    targetDate.setMonth(targetDate.getMonth() + goal.duration);
+                }
                 const bmr = (form.gender === 'male' ? (10 * form.weight) + (6.25 * form.height) - (5 * form.age) + 5 : (10 * form.weight) + (6.25 * form.height) - (5 * form.age) - 161);
                 const activityMultipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
                 const tdee = Math.round(bmr * activityMultipliers[form.activityLevel]);
                 const lossNeeded = form.weight - goal.targetWeight;
                 const totalDeficit = lossNeeded * 7700; 
-                const days = goal.duration * 30;
+                const days = goal.durationUnit === 'week' ? goal.duration * 7 : goal.duration * 30;
                 const dailyDeficit = Math.round(totalDeficit / days);
                 const dailyDietGoal = Math.max(tdee - 300 - (dailyDeficit * 0.7), 1200); 
                 const weeklyWorkoutGoal = Math.round((dailyDeficit * 0.3) * 7);
@@ -343,11 +349,39 @@
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 mb-2">언제까지 달성할까요?</label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {[1, 2, 3, 6, 12].map(m => (
-                                                <button key={m} onClick={() => setGoal({...goal, duration: m})} className={`py-2 rounded-lg text-sm font-bold border ${goal.duration === m ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>{m}개월 후</button>
-                                            ))}
+                                        
+                                        {/* 주/개월 토글 */}
+                                        <div className="flex bg-gray-100 rounded-lg p-1 mb-3">
+                                            <button 
+                                                type="button"
+                                                onClick={() => setGoal({...goal, durationUnit: 'week', duration: 4})} 
+                                                className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${goal.durationUnit === 'week' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                                            >
+                                                주
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setGoal({...goal, durationUnit: 'month', duration: 3})} 
+                                                className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${goal.durationUnit === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                                            >
+                                                개월
+                                            </button>
                                         </div>
+
+                                        {/* 기간 선택 버튼 */}
+                                        {goal.durationUnit === 'week' ? (
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {[2, 4, 8, 12].map(w => (
+                                                    <button type="button" key={w} onClick={() => setGoal({...goal, duration: w})} className={`py-2 rounded-lg text-sm font-bold border ${goal.duration === w && goal.durationUnit === 'week' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>{w}주</button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {[1, 2, 3, 6, 12].map(m => (
+                                                    <button type="button" key={m} onClick={() => setGoal({...goal, duration: m})} className={`py-2 rounded-lg text-sm font-bold border ${goal.duration === m && goal.durationUnit === 'month' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>{m}개월</button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                     {difficulty && (
                                         <div className={`p-4 rounded-xl border ${difficulty.color} bg-opacity-10 border-opacity-20`}>
@@ -418,6 +452,8 @@
             const [viewMode, setViewMode] = useState('main'); 
             const [withdrawReason, setWithdrawReason] = useState('');
             const [customReason, setCustomReason] = useState('');
+            const [editGoalMode, setEditGoalMode] = useState(false);
+            const [editedGoal, setEditedGoal] = useState({ targetWeight: '', duration: 3, durationUnit: 'month' });
 
             const handleWithdrawSubmit = () => {
                 if (!withdrawReason) return alert("탈퇴 사유를 선택해주세요.");
@@ -425,7 +461,59 @@
                 deleteAccount(reason);
             };
 
-            // 목표 난이도 계산 (OnboardingPage와 동일)
+            // 목표 수정 모드 시작
+            const handleStartEditGoal = () => {
+                if (!profile) return;
+                setEditedGoal({
+                    targetWeight: profile.targetWeight || '',
+                    duration: profile.duration || 3,
+                    durationUnit: profile.durationUnit || 'month'
+                });
+                setEditGoalMode(true);
+            };
+
+            // 목표 수정 저장
+            const handleSaveGoal = async () => {
+                if (!editedGoal.targetWeight) return alert('목표 체중을 입력해주세요.');
+                
+                const targetDate = new Date();
+                if (editedGoal.durationUnit === 'week') {
+                    targetDate.setDate(targetDate.getDate() + (editedGoal.duration * 7));
+                } else {
+                    targetDate.setMonth(targetDate.getMonth() + editedGoal.duration);
+                }
+
+                const weight = parseFloat(profile.weight);
+                const bmr = (profile.gender === 'male' ? (10 * weight) + (6.25 * profile.height) - (5 * profile.age) + 5 : (10 * weight) + (6.25 * profile.height) - (5 * profile.age) - 161);
+                const activityMultipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+                const tdee = Math.round(bmr * activityMultipliers[profile.activityLevel]);
+                const lossNeeded = weight - editedGoal.targetWeight;
+                const totalDeficit = lossNeeded * 7700;
+                const days = editedGoal.durationUnit === 'week' ? editedGoal.duration * 7 : editedGoal.duration * 30;
+                const dailyDeficit = Math.round(totalDeficit / days);
+                const dailyDietGoal = Math.max(tdee - 300 - (dailyDeficit * 0.7), 1200);
+                const weeklyWorkoutGoal = Math.round((dailyDeficit * 0.3) * 7);
+
+                const updatedProfile = {
+                    ...profile,
+                    ...editedGoal,
+                    targetDate: targetDate.toISOString().split('T')[0],
+                    tdee,
+                    dailyDietGoal,
+                    weeklyWorkoutGoal
+                };
+
+                // Firestore 저장
+                const { doc, setDoc } = window.firebaseApp;
+                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile'), updatedProfile);
+                
+                // 로컬 state 업데이트는 부모 컴포넌트에서 처리되므로 여기서는 모드만 닫음
+                setEditGoalMode(false);
+                alert('목표가 수정되었습니다!');
+                window.location.reload(); // 간단하게 새로고침
+            };
+
+            // 목표 난이도 계산
             const calculateGoalDifficulty = () => {
                 if (!profile) return null;
                 const current = parseFloat(profile.weight);
@@ -433,7 +521,23 @@
                 if (!current || !target || !profile.duration) return null;
                 if (target >= current) return { label: '증량/유지', msg: "건강한 증량/유지 목표네요! 근력 운동 위주로 추천해드릴게요.", color: "text-blue-600 bg-blue-50" };
                 const loss = current - target;
-                const weeks = profile.duration * 4.3;
+                const weeks = (profile.durationUnit === 'week' ? profile.duration : profile.duration * 4.3);
+                const weeklyLoss = loss / weeks;
+                if (weeklyLoss < 0.5) return { label: 'EASY', msg: "충분히 가능해요! 🍵\n천천히 건강하게 빠지는 속도입니다.", color: "text-green-600 bg-green-50" };
+                if (weeklyLoss <= 0.8) return { label: 'NORMAL', msg: "가장 이상적인 목표예요! 👍\n표준적인 속도입니다. 꾸준함이 답!", color: "text-blue-600 bg-blue-50" };
+                if (weeklyLoss <= 1.2) return { label: 'HARD', msg: "조금 타이트한 도전이에요! 🔥\n식단 관리가 꽤 중요합니다.", color: "text-orange-600 bg-orange-50" };
+                return { label: 'EXTREME', msg: "건강에 무리가 될 수 있어요 🚨\n기간을 더 늘리시는 걸 추천해요.", color: "text-red-600 bg-red-50" };
+            };
+
+            // 수정 폼의 난이도 계산
+            const calculateEditDifficulty = () => {
+                if (!profile || !editedGoal.targetWeight) return null;
+                const current = parseFloat(profile.weight);
+                const target = parseFloat(editedGoal.targetWeight);
+                if (!current || !target || !editedGoal.duration) return null;
+                if (target >= current) return { label: '증량/유지', msg: "건강한 증량/유지 목표네요! 근력 운동 위주로 추천해드릴게요.", color: "text-blue-600 bg-blue-50" };
+                const loss = current - target;
+                const weeks = editedGoal.durationUnit === 'week' ? editedGoal.duration : editedGoal.duration * 4.3;
                 const weeklyLoss = loss / weeks;
                 if (weeklyLoss < 0.5) return { label: 'EASY', msg: "충분히 가능해요! 🍵\n천천히 건강하게 빠지는 속도입니다.", color: "text-green-600 bg-green-50" };
                 if (weeklyLoss <= 0.8) return { label: 'NORMAL', msg: "가장 이상적인 목표예요! 👍\n표준적인 속도입니다. 꾸준함이 답!", color: "text-blue-600 bg-blue-50" };
@@ -451,6 +555,7 @@
             };
 
             const goalDifficulty = calculateGoalDifficulty();
+            const editDifficulty = calculateEditDifficulty();
             const daysRemaining = getDaysRemaining();
 
             if (viewMode === 'contact') {
@@ -463,6 +568,76 @@
                             <p className="text-gray-500 leading-relaxed">추가하고 싶은 운동이나,<br/>개선 사항이 있으면 언제든 메일주세요.</p>
                             <a href="mailto:chongtaeklee@gmail.com" className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-blue-700 transition-colors flex items-center"><Icon name="send" size={18} className="mr-2" /> 메일 보내기</a>
                             <p className="text-sm text-gray-400 mt-4">chongtaeklee@gmail.com</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (editGoalMode) {
+                return (
+                    <div className="h-full flex flex-col animate-fade-in p-4 overflow-y-auto pb-20 no-scrollbar">
+                        <div className="flex items-center mb-6">
+                            <button onClick={() => setEditGoalMode(false)} className="p-2 hover:bg-gray-200 rounded-full mr-2"><Icon name="chevronLeft" /></button>
+                            <h2 className="text-xl font-bold">목표 수정하기</h2>
+                        </div>
+                        
+                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">목표 체중 (kg)</label>
+                                <div className="flex items-center gap-2">
+                                    <input type="number" className="w-full p-3 border rounded-lg bg-gray-50 font-bold text-lg text-blue-600" placeholder={profile.weight} value={editedGoal.targetWeight} onChange={e => setEditedGoal({...editedGoal, targetWeight: e.target.value})} />
+                                    <span className="text-gray-400 text-sm whitespace-nowrap">{editedGoal.targetWeight && profile.weight ? `${(editedGoal.targetWeight - profile.weight).toFixed(1)}kg` : ''}</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-2">언제까지 달성할까요?</label>
+                                
+                                {/* 주/개월 토글 */}
+                                <div className="flex bg-gray-100 rounded-lg p-1 mb-3">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setEditedGoal({...editedGoal, durationUnit: 'week', duration: 4})} 
+                                        className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editedGoal.durationUnit === 'week' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                                    >
+                                        주
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setEditedGoal({...editedGoal, durationUnit: 'month', duration: 3})} 
+                                        className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editedGoal.durationUnit === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                                    >
+                                        개월
+                                    </button>
+                                </div>
+
+                                {/* 기간 선택 */}
+                                {editedGoal.durationUnit === 'week' ? (
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {[2, 4, 8, 12].map(w => (
+                                            <button type="button" key={w} onClick={() => setEditedGoal({...editedGoal, duration: w})} className={`py-2 rounded-lg text-sm font-bold border ${editedGoal.duration === w && editedGoal.durationUnit === 'week' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>{w}주</button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[1, 2, 3, 6, 12].map(m => (
+                                            <button type="button" key={m} onClick={() => setEditedGoal({...editedGoal, duration: m})} className={`py-2 rounded-lg text-sm font-bold border ${editedGoal.duration === m && editedGoal.durationUnit === 'month' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>{m}개월</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {editDifficulty && (
+                                <div className={`p-4 rounded-xl border ${editDifficulty.color} bg-opacity-10 border-opacity-20`}>
+                                    <p className="font-bold text-sm mb-1">{editDifficulty.label}</p>
+                                    <p className="text-xs whitespace-pre-line leading-relaxed">{editDifficulty.msg}</p>
+                                </div>
+                            )}
+
+                            <div className="flex gap-2 pt-2">
+                                <button onClick={() => setEditGoalMode(false)} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold">취소</button>
+                                <button onClick={handleSaveGoal} className="flex-[2] bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md">저장하기</button>
+                            </div>
                         </div>
                     </div>
                 );
@@ -500,10 +675,15 @@
 
                     {/* 나의 목표 카드 */}
                     {profile && (
-                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-sm border border-blue-100 p-6 mb-4">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                                <span className="text-2xl mr-2">🎯</span> 나의 목표
-                            </h3>
+                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-sm border border-blue-100 p-6 mb-4 cursor-pointer hover:shadow-md transition-shadow" onClick={handleStartEditGoal}>
+                            <div className="flex justify-between items-start mb-4">
+                                <h3 className="text-lg font-bold text-gray-800 flex items-center">
+                                    <span className="text-2xl mr-2">🎯</span> 나의 목표
+                                </h3>
+                                <button className="p-2 hover:bg-white/50 rounded-lg transition-colors">
+                                    <Icon name="edit" size={20} className="text-blue-600" />
+                                </button>
+                            </div>
                             
                             <div className="bg-white rounded-xl p-4 mb-3">
                                 <div className="flex justify-between items-center mb-2">
@@ -512,7 +692,9 @@
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm text-gray-500 font-medium">달성 기간</span>
-                                    <span className="text-sm font-bold text-gray-700">{profile.duration}개월 ({profile.targetDate ? new Date(profile.targetDate).toLocaleDateString('ko-KR') : '-'}까지)</span>
+                                    <span className="text-sm font-bold text-gray-700">
+                                        {profile.duration}{profile.durationUnit === 'week' ? '주' : '개월'} ({profile.targetDate ? new Date(profile.targetDate).toLocaleDateString('ko-KR') : '-'}까지)
+                                    </span>
                                 </div>
                             </div>
 
@@ -1223,7 +1405,7 @@
                         {activeTab === 'calendar' && (
                             <button 
                                 onClick={() => setActiveTab('record')} 
-                                className="fixed bottom-24 right-8 w-14 h-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all z-30"
+                                className="absolute bottom-24 right-8 w-14 h-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all z-30"
                                 style={{ boxShadow: '0 4px 20px rgba(59, 130, 246, 0.4)' }}
                             >
                                 <Icon name="plus" size={28} />

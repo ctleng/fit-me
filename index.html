@@ -1244,7 +1244,7 @@
                         </div>
 
                         {/* 대시보드 링 - 클릭시 상세 페이지로 */}
-                        <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="grid grid-cols-2 gap-4 mb-4">
                              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:shadow-md transition-all relative group" onClick={() => setCalendarViewMode('detail')}>
                                 <h3 className="text-xs font-bold text-gray-400 mb-2">{selectedDate.slice(5).replace('-','/')} 식단</h3>
                                 <ProgressRing 
@@ -1269,6 +1269,38 @@
                                     🔍 클릭해서 상세보기
                                 </div>
                             </div>
+                        </div>
+
+                        {/* 동기부여 메시지 */}
+                        <div className="mb-4 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 text-center">
+                            <p className="text-sm font-medium text-gray-700">
+                                {(() => {
+                                    const dietPercent = (dayIntake / dietGoal) * 100;
+                                    const exercisePercent = (weeklyBurned / workoutGoal) * 100;
+                                    
+                                    if (selectedDate !== new Date().toISOString().split('T')[0]) {
+                                        // 과거/미래 날짜
+                                        return "📅 다른 날짜를 선택했어요. 링을 클릭해서 상세보기! 🔍";
+                                    }
+                                    
+                                    if (dietPercent <= 80 && exercisePercent >= 80) {
+                                        return "💪 완벽해요! 식단과 운동 모두 훌륭합니다!";
+                                    }
+                                    if (dietPercent <= 90 && exercisePercent >= 50) {
+                                        return "👍 훌륭해요! 이 페이스를 유지하세요!";
+                                    }
+                                    if (dietPercent > 110) {
+                                        return "🍽️ 오늘은 조금 초과했어요. 내일 다시 도전해봐요!";
+                                    }
+                                    if (dietPercent <= 50) {
+                                        return `🎯 목표 대비 ${remainingDiet}kcal 여유 있어요!`;
+                                    }
+                                    if (exercisePercent < 30) {
+                                        return "🏃 운동을 조금 더 해볼까요? 힘내요!";
+                                    }
+                                    return "😊 좋은 하루 보내세요!";
+                                })()}
+                            </p>
                         </div>
 
                         {/* 캘린더 헤더 */}
@@ -1318,6 +1350,31 @@
                 const now = new Date();
                 const todayStr = new Date(Date.now() + 32400000).toISOString().split('T')[0];
 
+                // 최근 7일 데이터 생성
+                const last7Days = Array.from({ length: 7 }, (_, i) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - (6 - i));
+                    const dateStr = date.toISOString().split('T')[0];
+                    const dayLog = logs[dateStr];
+                    
+                    const intake = dayLog?.diet?.reduce((sum, item) => sum + (parseFloat(item.kcal) || 0), 0) || 0;
+                    const burned = dayLog?.exercises?.reduce((sum, ex) => sum + (ex.kcal || 0), 0) || 0;
+                    
+                    return {
+                        date: dateStr,
+                        dateLabel: `${date.getMonth() + 1}/${date.getDate()}`,
+                        intake,
+                        burned,
+                        goal: profile?.dailyDietGoal || 2000
+                    };
+                });
+
+                const avgIntake = last7Days.reduce((sum, d) => sum + d.intake, 0) / 7;
+                const avgGoal = profile?.dailyDietGoal || 2000;
+                const intakeDiff = avgGoal - avgIntake;
+                const weeklyBurnedTotal = last7Days.reduce((sum, d) => sum + d.burned, 0);
+                const weeklyGoalTotal = profile?.weeklyWorkoutGoal || 2000;
+
                 const filteredLogs = Object.entries(logs).filter(([dateStr, log]) => {
                     if (!log.exercises || log.exercises.length === 0) return false;
                     const date = new Date(dateStr);
@@ -1358,6 +1415,120 @@
                                     );
                                 })}
                             </div>
+                        </div>
+
+                        {/* 최근 7일 칼로리 차트 */}
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                            <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center">
+                                <span className="text-lg mr-2">📊</span> 최근 7일 칼로리 추이
+                            </h3>
+                            
+                            {last7Days.some(d => d.intake > 0) ? (
+                                <>
+                                    <div className="relative h-40 mb-4">
+                                        <div className="absolute inset-0 flex items-end justify-around gap-1">
+                                            {last7Days.map((day, i) => {
+                                                const maxVal = Math.max(...last7Days.map(d => Math.max(d.intake, d.goal))) + 500;
+                                                const height = (day.intake / maxVal) * 100;
+                                                const isOver = day.intake > day.goal;
+                                                
+                                                return (
+                                                    <div key={i} className="flex-1 flex flex-col items-center">
+                                                        <div className="w-full relative" style={{ height: '140px' }}>
+                                                            {/* 목표선 */}
+                                                            <div 
+                                                                className="absolute w-full border-t-2 border-dashed border-blue-300" 
+                                                                style={{ bottom: `${(day.goal / maxVal) * 100}%` }}
+                                                            ></div>
+                                                            {/* 바 */}
+                                                            <div 
+                                                                className={`absolute bottom-0 w-full rounded-t-lg transition-all ${isOver ? 'bg-red-400' : 'bg-green-400'}`}
+                                                                style={{ height: `${height}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-500 mt-1 font-medium">{day.dateLabel}</p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-center gap-4 text-xs mb-3">
+                                        <div className="flex items-center gap-1">
+                                            <div className="w-3 h-3 bg-green-400 rounded"></div>
+                                            <span className="text-gray-600">섭취</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <div className="w-3 h-3 bg-red-400 rounded"></div>
+                                            <span className="text-gray-600">초과</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <div className="w-6 h-0.5 border-t-2 border-dashed border-blue-300"></div>
+                                            <span className="text-gray-600">목표</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                                        <p className="text-sm font-bold text-gray-700">📈 이번 주 평균: {Math.round(avgIntake).toLocaleString()}kcal</p>
+                                        <p className="text-xs text-gray-600 mt-1">
+                                            {intakeDiff > 0 
+                                                ? `목표 대비 ${Math.abs(Math.round(intakeDiff))}kcal 여유 ✅` 
+                                                : `목표 대비 ${Math.abs(Math.round(intakeDiff))}kcal 초과 ⚠️`}
+                                        </p>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center py-8 text-gray-400">
+                                    <p className="mb-2">아직 기록이 없어요!</p>
+                                    <p className="text-xs">오늘부터 식단을 기록해보세요 💪</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 최근 7일 운동량 차트 */}
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                            <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center">
+                                <span className="text-lg mr-2">💪</span> 최근 7일 운동량
+                            </h3>
+                            
+                            {last7Days.some(d => d.burned > 0) ? (
+                                <>
+                                    <div className="relative h-32 mb-4">
+                                        <div className="absolute inset-0 flex items-end justify-around gap-1">
+                                            {last7Days.map((day, i) => {
+                                                const maxVal = Math.max(...last7Days.map(d => d.burned), 500);
+                                                const height = day.burned > 0 ? (day.burned / maxVal) * 100 : 0;
+                                                
+                                                return (
+                                                    <div key={i} className="flex-1 flex flex-col items-center">
+                                                        <div className="w-full relative" style={{ height: '100px' }}>
+                                                            <div 
+                                                                className="absolute bottom-0 w-full bg-blue-400 rounded-t-lg transition-all"
+                                                                style={{ height: `${height}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-500 mt-1 font-medium">{day.dateLabel}</p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                                        <p className="text-sm font-bold text-gray-700">🔥 이번 주 소모: {weeklyBurnedTotal.toLocaleString()}kcal</p>
+                                        <p className="text-xs text-gray-600 mt-1">
+                                            {weeklyBurnedTotal >= weeklyGoalTotal
+                                                ? `목표 초과 달성! 🎉`
+                                                : `목표의 ${Math.round((weeklyBurnedTotal / weeklyGoalTotal) * 100)}% 달성`}
+                                        </p>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center py-8 text-gray-400">
+                                    <p className="mb-2">아직 운동 기록이 없어요!</p>
+                                    <p className="text-xs">오늘부터 운동을 시작해보세요 🏃</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">

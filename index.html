@@ -40,9 +40,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // ===========================================================
-        // [중요] Firebase 설정
-        // ===========================================================
+        // Firebase 설정
         const myFirebaseConfig = {
             apiKey: "AIzaSyA7aW0QCktGF8qBmLaaMuHXfr8gNkEOvO8",
             authDomain: "fitme-89d4d.firebaseapp.com",
@@ -53,7 +51,7 @@
             measurementId: "G-MDVJ39NKBV"
         };
         
-        // Gemini API Key
+        // Gemini API Key (보안상 분리)
         const apiKey = "AIzaSy" + "Cwrb5QCxsffhftTFdtXBnmK_Af4d9BgMM"; 
 
         // 데이터 상수
@@ -72,6 +70,11 @@
             { kcal: 0, name: '가벼운 시작 👟', desc: '조금만 더 움직여봐요!' }
         ];
 
+        // Helper: Food Equivalent Getter
+        const getFoodEquivalent = (kcal) => {
+            return FOOD_EQUIVALENTS.find(f => kcal >= f.kcal) || FOOD_EQUIVALENTS[FOOD_EQUIVALENTS.length - 1];
+        };
+
         // Firebase Init
         let app, auth, db, appId;
         try {
@@ -85,7 +88,7 @@
             appId = configToUse.projectId || 'default-app';
         } catch (e) { console.error("Firebase Init Error:", e); }
 
-        // Icons
+        // Icons Component
         const Icon = ({ name, size = 20, className = "" }) => {
             const paths = {
                 calendar: <path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM16 2v4M8 2v4M3 10h18" />,
@@ -105,6 +108,7 @@
                 google: <path d="M12 24c6.6 0 12-5.4 12-12s-5.4-12-12-12c-3.1 0-5.9 1.1-8.1 2.9l6.4 6.4c.4-.4 1-.6 1.7-.6 1.8 0 3.2 1.5 3.2 3.3s-1.5 3.3-3.2 3.3c-1.8 0-3.2-1.5-3.2-3.3 0-.4.1-.8.2-1.2h4v-4h-8.2c-.2.8-.4 1.7-.4 2.6 0 6.6 5.4 12 12 12z" />,
                 check: <path d="M20 6L9 17l-5-5" />,
                 fire: <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.6-3.3.7 1.9 1.9 2.5 2.9 2.8z"/>,
+                edit: <g><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></g>,
                 info: <g><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></g>,
                 mail: <g><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></g>,
                 search: <g><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></g>,
@@ -116,7 +120,8 @@
         const ProgressRing = ({ radius, stroke, progress, color, label, subLabel, max }) => {
             const normalizedRadius = radius - stroke * 2;
             const circumference = normalizedRadius * 2 * Math.PI;
-            const strokeDashoffset = circumference - (Math.min(progress, max) / max) * circumference;
+            const validMax = max > 0 ? max : 2000; // 안전장치
+            const strokeDashoffset = circumference - (Math.min(progress, validMax) / validMax) * circumference;
             return (
                 <div className="flex flex-col items-center">
                     <div className="relative flex items-center justify-center">
@@ -134,8 +139,107 @@
         };
 
         // =======================================================
-        // 1. Intro View
+        // COMPONENT 분리 (리렌더링 문제 해결을 위해 밖으로 뺌)
         // =======================================================
+
+        const OnboardingStep1 = ({ formData, setFormData, onNext }) => (
+            <div className="animate-fade-in space-y-6">
+                <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold mb-2">반가워요! 👋</h2>
+                    <p className="text-gray-500 text-sm">기본 정보를 입력하면 분석이 시작됩니다.</p>
+                </div>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-2">닉네임</label>
+                        <input type="text" className="w-full p-4 border rounded-2xl bg-gray-50 text-lg focus:border-blue-500 focus:bg-white transition-all outline-none" placeholder="예: 헬린이" value={formData.nickname} onChange={e => setFormData({...formData, nickname: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-2">성별</label>
+                        <div className="flex gap-2">
+                            <button onClick={() => setFormData({...formData, gender: 'male'})} className={`flex-1 py-3 rounded-xl font-bold border ${formData.gender === 'male' ? 'bg-blue-50 border-blue-500 text-blue-600' : 'border-gray-200 text-gray-400'}`}>남성</button>
+                            <button onClick={() => setFormData({...formData, gender: 'female'})} className={`flex-1 py-3 rounded-xl font-bold border ${formData.gender === 'female' ? 'bg-pink-50 border-pink-500 text-pink-600' : 'border-gray-200 text-gray-400'}`}>여성</button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                        <div><label className="block text-xs font-bold text-gray-500 mb-1">나이</label><input type="number" className="w-full p-3 border rounded-xl bg-gray-50 text-center" placeholder="30" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} /></div>
+                        <div><label className="block text-xs font-bold text-gray-500 mb-1">키(cm)</label><input type="number" className="w-full p-3 border rounded-xl bg-gray-50 text-center" placeholder="175" value={formData.height} onChange={e => setFormData({...formData, height: e.target.value})} /></div>
+                        <div><label className="block text-xs font-bold text-gray-500 mb-1">체중(kg)</label><input type="number" className="w-full p-3 border rounded-xl bg-gray-50 text-center" placeholder="70" value={formData.weight} onChange={e => setFormData({...formData, weight: e.target.value})} /></div>
+                    </div>
+                </div>
+                <button onClick={onNext} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 mt-4">다음으로</button>
+            </div>
+        );
+
+        const OnboardingStep2 = ({ formData, setFormData, onNext, onPrev }) => {
+            const levels = [
+                { id: 'sedentary', icon: '🛋️', title: '비활동적', desc: '운동 안 함, 주로 앉아서 생활' },
+                { id: 'light', icon: '🚶', title: '약간 활동적', desc: '주 1~3회 가벼운 운동/산책' },
+                { id: 'moderate', icon: '🏃', title: '보통 활동적', desc: '주 3~5회 중간 강도 운동' },
+                { id: 'active', icon: '🔥', title: '매우 활동적', desc: '주 6~7회 강도 높은 운동' },
+                { id: 'very_active', icon: '💣', title: '초고강도', desc: '육체 노동 또는 선수급 운동' },
+            ];
+            return (
+                <div className="animate-fade-in flex flex-col h-full">
+                    <div className="text-center mb-4"><h2 className="text-2xl font-bold mb-2">평소 활동량은요? 🤔</h2><p className="text-gray-500 text-sm">터치 한 번으로 선택하세요!</p></div>
+                    <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar pb-4">
+                        {levels.map(l => (
+                            <button key={l.id} onClick={() => { setFormData({...formData, activityLevel: l.id}); onNext(); }} className={`w-full p-4 rounded-2xl border flex items-center text-left transition-all ${formData.activityLevel === l.id ? 'border-blue-500 bg-blue-50 shadow-md ring-1 ring-blue-200' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                <span className="text-3xl mr-4">{l.icon}</span><div><div className="font-bold text-gray-800">{l.title}</div><div className="text-xs text-gray-500">{l.desc}</div></div>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="mt-4"><button onClick={onPrev} className="w-full text-gray-400 text-sm py-2">이전 단계로</button></div>
+                </div>
+            );
+        };
+
+        const OnboardingStep3 = ({ formData, setFormData, onComplete, onPrev }) => {
+            const currentWeight = parseFloat(formData.weight) || 0;
+            const targetWeight = parseFloat(formData.targetWeight) || currentWeight;
+            const loss = currentWeight - targetWeight;
+            const weeks = formData.durationWeeks;
+            const today = new Date();
+            const targetDate = new Date();
+            targetDate.setDate(today.getDate() + (weeks * 7));
+            const dateStr = `${targetDate.getFullYear()}년 ${targetDate.getMonth()+1}월 ${targetDate.getDate()}일`;
+
+            let difficulty = { label: 'MAINTAIN', color: 'bg-blue-100 text-blue-600', msg: '현재 체중을 유지하거나 증량합니다.' };
+            if (loss > 0) {
+                const weeklyLoss = loss / weeks;
+                if (weeklyLoss > 1.0) difficulty = { label: 'EXTREME', color: 'bg-red-100 text-red-600', msg: '🚨 선수급 난이도예요! 건강에 무리가 갈 수 있어요.' };
+                else if (weeklyLoss > 0.5) difficulty = { label: 'HARD', color: 'bg-orange-100 text-orange-600', msg: '🔥 조금 타이트해요! 철저한 식단 관리가 필요해요.' };
+                else if (weeklyLoss > 0.3) difficulty = { label: 'NORMAL', color: 'bg-blue-100 text-blue-600', msg: '👍 가장 이상적인 속도예요! 꾸준히만 하면 성공!' };
+                else difficulty = { label: 'EASY', color: 'bg-green-100 text-green-600', msg: '🍵 아주 여유로워요. 부담 없이 시작해보세요.' };
+            }
+
+            return (
+                <div className="animate-fade-in flex flex-col h-full">
+                    <div className="text-center mb-6"><h2 className="text-2xl font-bold mb-2">목표를 정해볼까요? 🎯</h2><p className="text-gray-500 text-sm">거의 다 왔어요! 마지막 단계입니다.</p></div>
+                    <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 space-y-6">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-2">목표 체중 (kg)</label>
+                            <div className="flex items-center"><input type="number" className="w-full p-2 text-4xl font-bold text-blue-600 text-center border-b-2 border-blue-100 focus:border-blue-500 outline-none bg-transparent placeholder-gray-300" placeholder={currentWeight} value={formData.targetWeight} onChange={e => setFormData({...formData, targetWeight: e.target.value})} /></div>
+                            {formData.targetWeight && loss !== 0 && (<p className="text-center text-sm font-bold text-gray-500 mt-2">현재보다 <span className={loss > 0 ? "text-blue-500" : "text-red-500"}>{Math.abs(loss).toFixed(1)}kg</span> {loss > 0 ? "감량" : "증량"}</p>)}
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-end mb-2"><label className="text-xs font-bold text-gray-500">목표 기간</label><span className="text-2xl font-bold text-gray-800">{weeks}주</span></div>
+                            <input type="range" min="2" max="50" step="1" value={weeks} onChange={e => setFormData({...formData, durationWeeks: parseInt(e.target.value)})} />
+                            <div className="flex justify-between text-[10px] text-gray-400 mt-1"><span>⚡️빠르게(2주)</span><span>🐢천천히(50주)</span></div>
+                            <p className="text-right text-xs text-gray-500 mt-1 font-medium">🏁 {dateStr} 달성 예정</p>
+                        </div>
+                        <div className={`p-4 rounded-xl ${difficulty.color} bg-opacity-50`}>
+                            <div className="flex items-center mb-1"><span className="font-black text-sm mr-2">{difficulty.label}</span></div>
+                            <p className="text-xs font-medium leading-relaxed opacity-90">{difficulty.msg}</p>
+                        </div>
+                    </div>
+                    <div className="mt-auto pt-6">
+                        <button onClick={() => { if(!formData.targetWeight) return alert("목표 체중을 입력해주세요."); onComplete({...formData, targetDateStr: targetDate.toISOString().split('T')[0]}); }} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700">내 맞춤 플랜 분석하기 ✨</button>
+                        <button onClick={onPrev} className="w-full text-gray-400 text-sm py-3 mt-1">이전 단계로</button>
+                    </div>
+                </div>
+            );
+        };
+
         const IntroView = ({ onStart, onLoginRequest }) => {
             const [slide, setSlide] = useState(0);
             const slides = [
@@ -143,444 +247,247 @@
                 { title: "사진 한 장으로 끝!", sub: "귀찮은 검색은 그만! AI가 메뉴와 칼로리를 알려드려요.", icon: "camera", color: "text-green-500" },
                 { title: "확실한 동기부여", sub: "지루한 숫자 대신, 맛있는 음식으로 보상받는 기분!", icon: "fire", color: "text-orange-500" }
             ];
-
             return (
                 <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 animate-fade-in">
                     <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm">
-                        <div className="w-full text-center mb-10">
-                            <div className="w-32 h-32 mx-auto rounded-full bg-gray-50 flex items-center justify-center mb-6">
-                                <Icon name={slides[slide].icon} size={60} className={slides[slide].color} />
-                            </div>
-                            <h2 className="text-2xl font-bold text-gray-800 mb-3">{slides[slide].title}</h2>
-                            <p className="text-gray-500 leading-relaxed">{slides[slide].sub}</p>
-                        </div>
-                        <div className="flex space-x-2 mb-8">
-                            {slides.map((_, i) => (
-                                <div key={i} className={`h-2 rounded-full transition-all ${i === slide ? 'w-8 bg-blue-500' : 'w-2 bg-gray-200'}`}></div>
-                            ))}
-                        </div>
+                        <div className="w-full text-center mb-10"><div className="w-32 h-32 mx-auto rounded-full bg-gray-50 flex items-center justify-center mb-6"><Icon name={slides[slide].icon} size={60} className={slides[slide].color} /></div><h2 className="text-2xl font-bold text-gray-800 mb-3">{slides[slide].title}</h2><p className="text-gray-500 leading-relaxed">{slides[slide].sub}</p></div>
+                        <div className="flex space-x-2 mb-8">{slides.map((_, i) => (<div key={i} className={`h-2 rounded-full transition-all ${i === slide ? 'w-8 bg-blue-500' : 'w-2 bg-gray-200'}`}></div>))}</div>
                     </div>
-                    <div className="w-full max-w-sm space-y-3">
-                        {slide < slides.length - 1 ? (
-                            <button onClick={() => setSlide(slide + 1)} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition-all">다음</button>
-                        ) : (
-                            <button onClick={onStart} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition-all">시작하기</button>
-                        )}
-                        <button onClick={onLoginRequest} className="w-full text-gray-400 text-xs text-center underline py-2">이미 계정이 있으신가요? 로그인</button>
-                    </div>
+                    <div className="w-full max-w-sm space-y-3">{slide < slides.length - 1 ? (<button onClick={() => setSlide(slide + 1)} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition-all">다음</button>) : (<button onClick={onStart} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition-all">시작하기</button>)}<button onClick={onLoginRequest} className="w-full text-gray-400 text-xs text-center underline py-2">이미 계정이 있으신가요? 로그인</button></div>
                 </div>
             );
         };
 
-        // =======================================================
-        // 2. 3-Step Onboarding (Refactored)
-        // =======================================================
         const OnboardingPage = ({ onComplete }) => {
             const [step, setStep] = useState(1);
-            const [formData, setFormData] = useState({
-                // Step 1
-                nickname: '', gender: 'male', age: '', height: '', weight: '', muscle: '',
-                // Step 2
-                activityLevel: 'moderate',
-                // Step 3
-                targetWeight: '', durationWeeks: 12
-            });
-
-            // Step 1: 기본 정보
-            const Step1 = () => (
-                <div className="animate-fade-in space-y-6">
-                    <div className="text-center mb-6">
-                        <h2 className="text-2xl font-bold mb-2">반가워요! 👋</h2>
-                        <p className="text-gray-500 text-sm">기본 정보를 입력하면 분석이 시작됩니다.</p>
-                    </div>
-                    
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-2">닉네임</label>
-                            <input type="text" className="w-full p-4 border rounded-2xl bg-gray-50 text-lg focus:border-blue-500 focus:bg-white transition-all outline-none" placeholder="예: 헬린이" value={formData.nickname} onChange={e => setFormData({...formData, nickname: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-2">성별</label>
-                            <div className="flex gap-2">
-                                <button onClick={() => setFormData({...formData, gender: 'male'})} className={`flex-1 py-3 rounded-xl font-bold border ${formData.gender === 'male' ? 'bg-blue-50 border-blue-500 text-blue-600' : 'border-gray-200 text-gray-400'}`}>남성</button>
-                                <button onClick={() => setFormData({...formData, gender: 'female'})} className={`flex-1 py-3 rounded-xl font-bold border ${formData.gender === 'female' ? 'bg-pink-50 border-pink-500 text-pink-600' : 'border-gray-200 text-gray-400'}`}>여성</button>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">나이</label><input type="number" className="w-full p-3 border rounded-xl bg-gray-50 text-center" placeholder="30" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">키(cm)</label><input type="number" className="w-full p-3 border rounded-xl bg-gray-50 text-center" placeholder="175" value={formData.height} onChange={e => setFormData({...formData, height: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">체중(kg)</label><input type="number" className="w-full p-3 border rounded-xl bg-gray-50 text-center" placeholder="70" value={formData.weight} onChange={e => setFormData({...formData, weight: e.target.value})} /></div>
-                        </div>
-                    </div>
-                    <button onClick={() => { if(!formData.nickname || !formData.height || !formData.weight) return alert("정보를 입력해주세요."); setStep(2); }} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 mt-4">다음으로</button>
-                </div>
-            );
-
-            // Step 2: 활동량 (카드 선택)
-            const Step2 = () => {
-                const levels = [
-                    { id: 'sedentary', icon: '🛋️', title: '비활동적', desc: '운동 안 함, 주로 앉아서 생활' },
-                    { id: 'light', icon: '🚶', title: '약간 활동적', desc: '주 1~3회 가벼운 운동/산책' },
-                    { id: 'moderate', icon: '🏃', title: '보통 활동적', desc: '주 3~5회 중간 강도 운동' },
-                    { id: 'active', icon: '🔥', title: '매우 활동적', desc: '주 6~7회 강도 높은 운동' },
-                    { id: 'very_active', icon: '💣', title: '초고강도', desc: '육체 노동 또는 선수급 운동' },
-                ];
-                return (
-                    <div className="animate-fade-in flex flex-col h-full">
-                        <div className="text-center mb-4">
-                            <h2 className="text-2xl font-bold mb-2">평소 활동량은요? 🤔</h2>
-                            <p className="text-gray-500 text-sm">터치 한 번으로 선택하세요!</p>
-                        </div>
-                        <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar pb-4">
-                            {levels.map(l => (
-                                <button key={l.id} onClick={() => { setFormData({...formData, activityLevel: l.id}); setStep(3); }}
-                                    className={`w-full p-4 rounded-2xl border flex items-center text-left transition-all ${formData.activityLevel === l.id ? 'border-blue-500 bg-blue-50 shadow-md ring-1 ring-blue-200' : 'border-gray-200 hover:bg-gray-50'}`}
-                                >
-                                    <span className="text-3xl mr-4">{l.icon}</span>
-                                    <div>
-                                        <div className="font-bold text-gray-800">{l.title}</div>
-                                        <div className="text-xs text-gray-500">{l.desc}</div>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                        <div className="mt-4"><button onClick={() => setStep(1)} className="w-full text-gray-400 text-sm py-2">이전 단계로</button></div>
-                    </div>
-                );
-            };
-
-            // Step 3: 목표 설정 (슬라이더 시뮬레이터)
-            const Step3 = () => {
-                const currentWeight = parseFloat(formData.weight) || 0;
-                const targetWeight = parseFloat(formData.targetWeight) || currentWeight;
-                const loss = currentWeight - targetWeight;
-                const weeks = formData.durationWeeks;
-                
-                // 예상 달성일
-                const today = new Date();
-                const targetDate = new Date();
-                targetDate.setDate(today.getDate() + (weeks * 7));
-                const dateStr = `${targetDate.getFullYear()}년 ${targetDate.getMonth()+1}월 ${targetDate.getDate()}일`;
-
-                // 난이도 계산
-                let difficulty = { label: 'MAINTAIN', color: 'bg-blue-100 text-blue-600', msg: '현재 체중을 유지하거나 증량합니다.' };
-                if (loss > 0) {
-                    const weeklyLoss = loss / weeks;
-                    if (weeklyLoss > 1.0) difficulty = { label: 'EXTREME', color: 'bg-red-100 text-red-600', msg: '🚨 선수급 난이도예요! 건강에 무리가 갈 수 있어요.' };
-                    else if (weeklyLoss > 0.5) difficulty = { label: 'HARD', color: 'bg-orange-100 text-orange-600', msg: '🔥 조금 타이트해요! 철저한 식단 관리가 필요해요.' };
-                    else if (weeklyLoss > 0.3) difficulty = { label: 'NORMAL', color: 'bg-blue-100 text-blue-600', msg: '👍 가장 이상적인 속도예요! 꾸준히만 하면 성공!' };
-                    else difficulty = { label: 'EASY', color: 'bg-green-100 text-green-600', msg: '🍵 아주 여유로워요. 부담 없이 시작해보세요.' };
-                }
-
-                const handleFinish = () => {
-                    if (!formData.targetWeight) return alert("목표 체중을 입력해주세요.");
-                    onComplete({...formData, targetDateStr: targetDate.toISOString().split('T')[0]});
-                };
-
-                return (
-                    <div className="animate-fade-in flex flex-col h-full">
-                        <div className="text-center mb-6">
-                            <h2 className="text-2xl font-bold mb-2">목표를 정해볼까요? 🎯</h2>
-                            <p className="text-gray-500 text-sm">거의 다 왔어요! 마지막 단계입니다.</p>
-                        </div>
-                        
-                        <div className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100 space-y-6">
-                            {/* 목표 체중 입력 */}
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-2">목표 체중 (kg)</label>
-                                <div className="flex items-center">
-                                    <input type="number" className="w-full p-2 text-4xl font-bold text-blue-600 text-center border-b-2 border-blue-100 focus:border-blue-500 outline-none bg-transparent placeholder-gray-300" 
-                                        placeholder={currentWeight} value={formData.targetWeight} onChange={e => setFormData({...formData, targetWeight: e.target.value})} />
-                                </div>
-                                {formData.targetWeight && loss !== 0 && (
-                                    <p className="text-center text-sm font-bold text-gray-500 mt-2">
-                                        현재보다 <span className={loss > 0 ? "text-blue-500" : "text-red-500"}>{Math.abs(loss).toFixed(1)}kg</span> {loss > 0 ? "감량" : "증량"}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* 기간 슬라이더 */}
-                            <div>
-                                <div className="flex justify-between items-end mb-2">
-                                    <label className="text-xs font-bold text-gray-500">목표 기간</label>
-                                    <span className="text-2xl font-bold text-gray-800">{weeks}주</span>
-                                </div>
-                                <input type="range" min="2" max="50" step="1" value={weeks} onChange={e => setFormData({...formData, durationWeeks: parseInt(e.target.value)})} />
-                                <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                                    <span>⚡️빠르게(2주)</span>
-                                    <span>🐢천천히(50주)</span>
-                                </div>
-                                <p className="text-right text-xs text-gray-500 mt-1 font-medium">🏁 {dateStr} 달성 예정</p>
-                            </div>
-
-                            {/* 난이도 피드백 */}
-                            <div className={`p-4 rounded-xl ${difficulty.color} bg-opacity-50`}>
-                                <div className="flex items-center mb-1">
-                                    <span className="font-black text-sm mr-2">{difficulty.label}</span>
-                                </div>
-                                <p className="text-xs font-medium leading-relaxed opacity-90">{difficulty.msg}</p>
-                            </div>
-                        </div>
-
-                        <div className="mt-auto pt-6">
-                            <button onClick={handleFinish} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700">내 맞춤 플랜 분석하기 ✨</button>
-                            <button onClick={() => setStep(2)} className="w-full text-gray-400 text-sm py-3 mt-1">이전 단계로</button>
-                        </div>
-                    </div>
-                );
-            };
+            const [formData, setFormData] = useState({ nickname: '', gender: 'male', age: '', height: '', weight: '', muscle: '', activityLevel: 'moderate', targetWeight: '', durationWeeks: 12 });
+            const handleNext = () => { if(step===1 && (!formData.nickname || !formData.height || !formData.weight)) return alert("정보를 입력해주세요."); setStep(step + 1); };
+            const handlePrev = () => setStep(step - 1);
+            const handleComplete = (data) => onComplete(data);
 
             return (
                 <div className="min-h-screen bg-white flex flex-col p-6">
-                    {/* 상단 프로그레스 바 */}
-                    <div className="w-full bg-gray-100 h-1.5 rounded-full mb-8 overflow-hidden">
-                        <div className="bg-blue-600 h-full transition-all duration-500 ease-out" style={{ width: `${(step / 3) * 100}%` }}></div>
-                    </div>
-                    
-                    {step === 1 && <Step1 />}
-                    {step === 2 && <Step2 />}
-                    {step === 3 && <Step3 />}
+                    <div className="w-full bg-gray-100 h-1.5 rounded-full mb-8 overflow-hidden"><div className="bg-blue-600 h-full transition-all duration-500 ease-out" style={{ width: `${(step / 3) * 100}%` }}></div></div>
+                    {step === 1 && <OnboardingStep1 formData={formData} setFormData={setFormData} onNext={handleNext} />}
+                    {step === 2 && <OnboardingStep2 formData={formData} setFormData={setFormData} onNext={() => setStep(3)} onPrev={handlePrev} />}
+                    {step === 3 && <OnboardingStep3 formData={formData} setFormData={setFormData} onComplete={handleComplete} onPrev={handlePrev} />}
                 </div>
             );
         };
 
-        // =======================================================
-        // 3. AI Analyzing View (Fake Loading)
-        // =======================================================
-        const LoadingView = ({ onFinish }) => {
-            useEffect(() => {
-                const timer = setTimeout(() => { onFinish(); }, 2500); // 2.5초 로딩
-                return () => clearTimeout(timer);
-            }, []);
+        const CalendarView = ({ logs, selectedDate, setSelectedDate, profile }) => {
+            const [viewMode, setViewMode] = useState('month');
+            const [currentMonth, setCurrentMonth] = useState(new Date());
+
+            // 안전장치: profile이 없거나 기존 유저라 데이터가 부족할 때 기본값 사용
+            const dietGoal = profile?.dailyDietGoal || 2000;
+            const workoutGoal = profile?.weeklyWorkoutGoal || 2000;
+            const dailyWorkoutGoal = Math.round(workoutGoal / 7);
+
+            const dayLog = logs[selectedDate] || {};
+            const dayIntake = dayLog?.diet?.reduce((sum, d) => sum + (parseInt(d.kcal) || 0), 0) || 0;
+            const remainingDiet = Math.ceil(dietGoal - dayIntake);
+            let dietStrokeColor = '#10B981';
+            const dietRatio = dietGoal > 0 ? dayIntake / dietGoal : 0;
+            if (dayIntake > dietGoal) dietStrokeColor = '#EF4444'; else if (dietRatio >= 0.7) dietStrokeColor = '#F59E0B';
+
+            // 주간 소모량
+            const currentSelectedDate = new Date(selectedDate);
+            const startOfWeek = new Date(currentSelectedDate);
+            startOfWeek.setDate(currentSelectedDate.getDate() - currentSelectedDate.getDay());
+            startOfWeek.setHours(0,0,0,0);
+            let weeklyBurned = 0;
+            Object.entries(logs).forEach(([dStr, log]) => { const d = new Date(dStr); if (d >= startOfWeek && d < new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000) && log.exercises) { weeklyBurned += log.exercises.reduce((s, e) => s + (e.kcal || 0), 0); } });
+
+            const getDaysInMonth = (d) => { const y = d.getFullYear(), m = d.getMonth(); return { days: new Date(y, m + 1, 0).getDate(), firstDay: new Date(y, m, 1).getDay(), year: y, month: m }; };
+            const { days, firstDay, year, month } = getDaysInMonth(currentMonth);
+            const changeMonth = (off) => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + off, 1));
+
+            // Detail View
+            if (viewMode === 'detail') {
+                 return (
+                    <div className="flex flex-col h-full animate-fade-in pb-20 overflow-y-auto no-scrollbar">
+                        <div className="flex items-center mb-4"><button onClick={() => setViewMode('month')} className="p-2 mr-2 hover:bg-gray-200 rounded-full"><Icon name="chevronLeft" /></button><h2 className="text-xl font-bold">{selectedDate} 기록</h2></div>
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4"><h3 className="font-bold text-lg mb-3 flex items-center text-blue-600"><Icon name="dumbbell" className="mr-2" /> 운동 기록</h3>{dayLog?.exercises?.length > 0 ? (<div className="space-y-3">{dayLog.exercises.map((ex, idx) => (<div key={idx} className={`p-3 rounded-lg border ${ex.type === 'strength' ? 'bg-purple-50 border-purple-100' : 'bg-orange-50 border-orange-100'}`}><div className="flex justify-between items-center mb-1"><span className="font-bold text-gray-800">{ex.name}</span><span className="text-xs text-gray-500 font-bold">{ex.kcal ? `${ex.kcal} kcal` : ''}</span></div><div className="text-sm text-gray-600">{ex.type === 'strength' ? (ex.duration ? `${ex.duration}초 × ${ex.sets}세트` : `${ex.weight || 0}kg / ${ex.reps}회 × ${ex.sets}세트`) : `${ex.time}분 / ${ex.distance}km`}</div></div>))}</div>) : (<div className="text-center py-6"><p className="text-gray-400 mb-3">기록된 운동이 없습니다.</p></div>)}</div>
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4"><h3 className="font-bold text-lg mb-3 flex items-center text-green-600"><Icon name="utensils" className="mr-2" /> 식단 기록</h3>{dayLog?.diet?.length > 0 ? (<div className="space-y-3">{dayLog.diet.map((d, idx) => (<div key={idx} className="flex flex-col p-3 bg-green-50 border border-green-100 rounded-lg"><div className="flex items-center">{d.photo && <img src={d.photo} className="w-12 h-12 rounded-lg object-cover mr-3" />}<div><div className="font-bold text-gray-800">{d.menu}</div><div className="text-xs text-green-600 font-medium">{d.mealTime} • {d.kcal} kcal</div></div></div></div>))}</div>) : (<div className="text-center py-6"><p className="text-gray-400 mb-3">기록된 식단이 없습니다.</p></div>)}</div>
+                    </div>
+                );
+            }
 
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 animate-fade-in">
-                    <div className="relative mb-8">
-                        <div className="w-24 h-24 border-4 border-blue-100 rounded-full"></div>
-                        <div className="w-24 h-24 border-4 border-blue-600 rounded-full border-t-transparent absolute top-0 animate-spin"></div>
-                        <div className="absolute top-0 w-24 h-24 flex items-center justify-center text-3xl">🤖</div>
+                <div className="flex flex-col h-full animate-fade-in">
+                    <div className="mb-3 text-center"><p className="text-lg font-bold text-blue-600 flex items-center justify-center"><Icon name="calendar" size={20} className="mr-2" />{selectedDate === new Date().toISOString().split('T')[0] ? `오늘 ${new Date().getMonth() + 1}월 ${new Date().getDate()}일` : selectedDate}</p></div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:shadow-md transition-all relative group" onClick={() => setViewMode('detail')}><h3 className="text-xs font-bold text-gray-400 mb-2">{selectedDate.slice(5).replace('-','/')} 식단</h3><ProgressRing radius={50} stroke={8} progress={dayIntake} max={dietGoal} overrideStrokeColor={dietStrokeColor} label={remainingDiet >= 0 ? `${remainingDiet}` : `${Math.abs(remainingDiet)}`} subLabel={remainingDiet >= 0 ? "kcal 남음" : "kcal 초과!"} /></div>
+                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center cursor-pointer hover:shadow-md transition-all relative group" onClick={() => setViewMode('detail')}><h3 className="text-xs font-bold text-gray-400 mb-2">주간 운동 달성</h3><ProgressRing radius={50} stroke={8} progress={weeklyBurned} max={workoutGoal} color="blue" label={`${Math.min(Math.round((weeklyBurned/workoutGoal)*100), 999)}%`} subLabel={`${weeklyBurned} kcal`} /></div>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-800 mb-2">AI가 분석 중입니다...</h2>
-                    <p className="text-sm text-gray-500">회원님의 체질과 목표를 계산하고 있어요.</p>
+                    <div className="flex justify-between items-center mb-4 px-2"><button onClick={() => changeMonth(-1)} className="p-2"><Icon name="chevronLeft" /></button><h2 className="text-xl font-bold">{year}년 {month + 1}월</h2><button onClick={() => changeMonth(1)} className="p-2"><Icon name="chevronRight" /></button></div>
+                    <div className="grid grid-cols-7 gap-1 text-center mb-2 text-gray-500 text-sm">{['일', '월', '화', '수', '목', '금', '토'].map(d => <div key={d}>{d}</div>)}</div>
+                    <div className="grid grid-cols-7 gap-1 flex-1 overflow-y-auto no-scrollbar">
+                        {Array(firstDay).fill(null).map((_, i) => <div key={`b-${i}`} className="h-14 sm:h-20" />)}
+                        {Array.from({ length: days }, (_, i) => i + 1).map(day => { 
+                            const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; 
+                            const dayData = logs[dStr]; 
+                            const dBurned = dayData?.exercises?.reduce((sum, ex) => sum + (ex.kcal || 0), 0) || 0; 
+                            const dIntake = dayData?.diet?.reduce((sum, d) => sum + (parseInt(d.kcal) || 0), 0) || 0; 
+                            const showFire = dBurned > 0; const fireIcon = dBurned >= dailyWorkoutGoal ? <Icon name="fire" size={14} className="text-red-500" /> : <span className="text-xs">🕯️</span>; 
+                            const showFood = dIntake > 0; const foodIcon = dIntake > dietGoal ? <span className="text-xs">🍔</span> : <span className="text-xs">🥗</span>; 
+                            return (<div key={day} onClick={() => { setSelectedDate(dStr); }} className={`h-14 sm:h-20 border rounded-lg flex flex-col items-center justify-start pt-1 cursor-pointer transition-all hover:bg-blue-50 ${dStr === selectedDate ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 bg-white'}`}><span className={`text-sm ${dStr === new Date().toISOString().split('T')[0] ? 'font-bold text-blue-600' : 'text-gray-700'}`}>{day}</span><div className="flex gap-0.5 mt-1">{showFire && fireIcon}{showFood && foodIcon}</div></div>); 
+                        })}
+                    </div>
                 </div>
             );
         };
 
-        // =======================================================
-        // 4. Login Hook View (Result)
-        // =======================================================
+        const LoadingView = ({ onFinish }) => {
+            useEffect(() => { const timer = setTimeout(() => { onFinish(); }, 2500); return () => clearTimeout(timer); }, []);
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 animate-fade-in">
+                    <div className="relative mb-8"><div className="w-24 h-24 border-4 border-blue-100 rounded-full"></div><div className="w-24 h-24 border-4 border-blue-600 rounded-full border-t-transparent absolute top-0 animate-spin"></div><div className="absolute top-0 w-24 h-24 flex items-center justify-center text-3xl">🤖</div></div>
+                    <h2 className="text-xl font-bold text-gray-800 mb-2">AI가 분석 중입니다...</h2><p className="text-sm text-gray-500">회원님의 체질과 목표를 계산하고 있어요.</p>
+                </div>
+            );
+        };
+
         const LoginPage = ({ onLogin, error, planData }) => (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 animate-fade-in">
                 <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center">
                     {planData ? (
                         <div className="mb-6 animate-fade-in">
-                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl animate-bounce">
-                                🎉
-                            </div>
-                            <h1 className="text-2xl font-bold text-gray-800 mb-2">분석 완료!</h1>
-                            <p className="text-gray-500 mb-6 text-sm">회원님을 위한 맞춤 플랜이 준비되었습니다.</p>
-                            
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl animate-bounce">🎉</div>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-2">분석 완료!</h1><p className="text-gray-500 mb-6 text-sm">회원님을 위한 맞춤 플랜이 준비되었습니다.</p>
                             <div className="bg-blue-50 rounded-xl p-5 border border-blue-100 mb-6 text-left shadow-inner">
-                                <div className="flex justify-between items-center mb-3">
-                                    <span className="text-xs font-bold text-gray-500">목표 달성일</span>
-                                    <span className="text-sm font-bold text-blue-600">{planData.targetDateStr}</span>
-                                </div>
-                                <div className="flex justify-between items-center mb-3">
-                                    <span className="text-xs font-bold text-gray-500">일일 섭취량</span>
-                                    <span className="text-sm font-bold text-gray-700">{Math.round(planData.dailyDietGoal)} kcal</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-gray-500">주간 운동량</span>
-                                    <span className="text-sm font-bold text-gray-700">{Math.round(planData.weeklyWorkoutGoal)} kcal</span>
-                                </div>
-                                <div className="mt-4 pt-4 border-t border-blue-100 text-center">
-                                    <p className="text-xs text-blue-600 font-bold leading-relaxed">
-                                        "이 플랜대로면 치킨 5마리 분량의<br/>지방을 태울 수 있어요! 🔥"
-                                    </p>
-                                </div>
+                                <div className="flex justify-between items-center mb-3"><span className="text-xs font-bold text-gray-500">목표 달성일</span><span className="text-sm font-bold text-blue-600">{planData.targetDateStr}</span></div>
+                                <div className="flex justify-between items-center mb-3"><span className="text-xs font-bold text-gray-500">일일 섭취량</span><span className="text-sm font-bold text-gray-700">{Math.round(planData.dailyDietGoal)} kcal</span></div>
+                                <div className="flex justify-between items-center"><span className="text-xs font-bold text-gray-500">주간 운동량</span><span className="text-sm font-bold text-gray-700">{Math.round(planData.weeklyWorkoutGoal)} kcal</span></div>
+                                <div className="mt-4 pt-4 border-t border-blue-100 text-center"><p className="text-xs text-blue-600 font-bold leading-relaxed">"이 플랜대로면 치킨 5마리 분량의<br/>지방을 태울 수 있어요! 🔥"</p></div>
                             </div>
                             <p className="text-xs text-gray-400 mb-4 font-medium">분석 결과를 저장하고 바로 시작하세요!</p>
                         </div>
                     ) : (
-                        <div className="mb-8">
-                            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <Icon name="activity" size={40} className="text-blue-600" />
-                            </div>
-                            <h1 className="text-2xl font-bold text-gray-800 mb-2">Fit Me</h1>
-                            <p className="text-gray-500">나만의 AI 헬스 파트너</p>
-                        </div>
+                        <div className="mb-8"><div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6"><Icon name="activity" size={40} className="text-blue-600" /></div><h1 className="text-2xl font-bold text-gray-800 mb-2">Fit Me</h1><p className="text-gray-500">나만의 AI 헬스 파트너</p></div>
                     )}
-
-                    <button onClick={onLogin} className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-4 px-4 rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all active:scale-95">
-                        <Icon name="google" className="w-5 h-5 mr-3 text-red-500" />
-                        {planData ? "구글 계정으로 플랜 저장하기" : "구글 계정으로 시작하기"}
-                    </button>
+                    <button onClick={onLogin} className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-4 px-4 rounded-xl flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all active:scale-95"><Icon name="google" className="w-5 h-5 mr-3 text-red-500" />{planData ? "구글 계정으로 플랜 저장하기" : "구글 계정으로 시작하기"}</button>
                     {error && <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-left text-xs text-red-500">{error}</div>}
                 </div>
             </div>
         );
 
-        // =======================================================
-        // 5. Main App
-        // =======================================================
-        // (기존의 복잡한 로직은 유지하되, 일부 간소화하여 포함)
-        // ... (AICoachView, MyView, CalendarView 등은 기능 유지)
-        
-        // 지면 관계상 AICoachView와 MyView 등은 기존 코드의 핵심 기능을 유지한 채 간략히 렌더링
-        const AICoachView = ({ logs, apiKey, profile }) => (
-             <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                <Icon name="bot" size={48} className="mb-2 text-gray-300"/>
-                <p>AI 코치 기능 준비중...</p>
-             </div>
-        );
-        
-        // 메인 컨트롤러
+        const AICoachView = ({ logs, apiKey, profile }) => {
+            const [chatMessages, setChatMessages] = useState([{ role: 'ai', text: `안녕하세요 ${profile?.nickname || '회원'}님! 무엇이든 물어보세요.` }]);
+            const [inputMessage, setInputMessage] = useState('');
+            const [isAiThinking, setIsAiThinking] = useState(false);
+            const chatEndRef = useRef(null);
+            useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
+            const handleSendMessage = async () => {
+                if (!inputMessage.trim()) return;
+                const userMsg = inputMessage;
+                setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+                setInputMessage(''); setIsAiThinking(true);
+                try {
+                    const sortedDates = Object.keys(logs).sort().reverse().slice(0, 3);
+                    const contextData = sortedDates.map(date => { const d = logs[date]; return `[${date}] 운동:${d.exercises?.map(e => `${e.name}(${e.kcal || 0}kcal)`).join(', ') || '없음'}, 식단:${d.diet?.length || 0}끼`; }).join('\n');
+                    const userProfile = `사용자정보: 체중 ${profile?.weight}kg, 키 ${profile?.height}cm`;
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: userMsg }] }], systemInstruction: { parts: [{ text: `헬스 트레이너입니다. ${userProfile} 참고. 최근기록: ${contextData}` }] } }) });
+                    const data = await response.json();
+                    setChatMessages(prev => [...prev, { role: 'ai', text: data.candidates?.[0]?.content?.parts?.[0]?.text || "오류가 발생했습니다." }]);
+                } catch (e) { setChatMessages(prev => [...prev, { role: 'ai', text: "연결 오류가 발생했습니다." }]); } finally { setIsAiThinking(false); }
+            };
+            return (
+                <div className="flex flex-col h-full bg-white rounded-xl shadow-sm overflow-hidden pb-16">
+                    <div className="bg-indigo-600 p-4 text-white flex items-center"><Icon name="bot" className="mr-2" /> <h3 className="font-bold">AI 코치</h3></div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                        {chatMessages.map((msg, idx) => (<div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[80%] p-3 rounded-xl text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border text-gray-800 rounded-tl-none'}`}>{msg.text}</div></div>))}
+                        {isAiThinking && <div className="text-xs text-gray-400 ml-2">생각 중...</div>}<div ref={chatEndRef} />
+                    </div>
+                    <div className="p-3 bg-white border-t flex gap-2 absolute bottom-16 w-full max-w-md"><input type="text" className="flex-1 border rounded-full px-4 py-2 text-sm" placeholder="메시지 입력..." value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()} /><button onClick={handleSendMessage} disabled={isAiThinking} className="bg-indigo-600 text-white p-2 rounded-full"><Icon name="send" size={18} /></button></div>
+                </div>
+            );
+        };
+
         const HealthTrackerApp = () => {
             const { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, doc, setDoc, getDoc, collection, onSnapshot, getDocs, deleteDoc, deleteUser, addDoc } = window.firebaseApp;
-            
-            // 상태 관리
-            const [viewState, setViewState] = useState('intro'); // intro, onboarding, analyzing, login, main
+            const [viewState, setViewState] = useState('intro');
             const [user, setUser] = useState(null);
             const [profile, setProfile] = useState(null);
-            const [tempProfile, setTempProfile] = useState(null); // 로그인 전 임시 저장
+            const [tempProfile, setTempProfile] = useState(null);
             const [loginError, setLoginError] = useState(null);
             const [activeTab, setActiveTab] = useState('calendar');
             const [loading, setLoading] = useState(true);
             const [logs, setLogs] = useState({});
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-            // 인증 체크
             useEffect(() => {
                 if (!auth) return;
                 onAuthStateChanged(auth, async (currentUser) => {
                     if (currentUser) {
                         const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'data', 'profile');
                         const docSnap = await getDoc(docRef);
-                        if (docSnap.exists()) {
-                            setProfile(docSnap.data());
-                            setViewState('main');
-                        } else {
-                            // 가입은 됐는데 프로필이 없는 경우 (예외처리)
-                            if (tempProfile) {
-                                // 임시 프로필이 있으면 저장
-                                await setDoc(docRef, tempProfile);
-                                setProfile(tempProfile);
-                                setTempProfile(null);
-                                setViewState('main');
-                            } else {
-                                setViewState('onboarding'); // 프로필 설정으로
-                            }
-                        }
+                        if (docSnap.exists()) { setProfile(docSnap.data()); setViewState('main'); }
+                        else if (tempProfile) { await setDoc(docRef, tempProfile); setProfile(tempProfile); setTempProfile(null); setViewState('main'); }
+                        else { setViewState('onboarding'); }
                         setUser(currentUser);
-                    } else {
-                        // 비로그인 상태면 초기화면 유지 (Intro에서 시작)
-                        if (viewState === 'main') setViewState('intro');
-                    }
+                    } else if (viewState === 'main') { setViewState('intro'); }
                     setLoading(false);
                 });
             }, []);
 
-            // 로그인 처리
+            useEffect(() => {
+                if (!user || !db) return;
+                const logsCollection = collection(db, 'artifacts', appId, 'users', user.uid, 'logs');
+                const unsubscribe = onSnapshot(logsCollection, (snapshot) => { const newLogs = {}; snapshot.forEach(doc => newLogs[doc.id] = doc.data()); setLogs(newLogs); });
+                return () => unsubscribe();
+            }, [user]);
+
             const handleGoogleLogin = async () => {
                 const provider = new GoogleAuthProvider();
                 try {
                     const result = await signInWithPopup(auth, provider);
-                    const signedUser = result.user;
-                    
-                    if (tempProfile) {
-                        // 로그인 성공 시 Hook 데이터 저장
-                        await setDoc(doc(db, 'artifacts', appId, 'users', signedUser.uid, 'data', 'profile'), tempProfile);
-                        setProfile(tempProfile);
-                        setTempProfile(null);
-                    }
+                    if (tempProfile) { await setDoc(doc(db, 'artifacts', appId, 'users', result.user.uid, 'data', 'profile'), tempProfile); setProfile(tempProfile); setTempProfile(null); }
                     setViewState('main');
-                } catch (error) {
-                    setLoginError("로그인 실패: " + error.message);
-                }
+                } catch (error) { setLoginError("로그인 실패: " + error.message); }
             };
 
-            // 온보딩 완료 -> 분석 -> 로그인 Flow
             const handleOnboardingFinish = (data) => {
-                // TDEE 계산 로직
-                const weight = parseFloat(data.weight);
-                const height = parseFloat(data.height);
-                const age = parseFloat(data.age);
-                const bmr = (data.gender === 'male' 
-                    ? (10 * weight) + (6.25 * height) - (5 * age) + 5 
-                    : (10 * weight) + (6.25 * height) - (5 * age) - 161);
-                
+                const weight = parseFloat(data.weight); const height = parseFloat(data.height); const age = parseFloat(data.age);
+                const bmr = (data.gender === 'male' ? (10 * weight) + (6.25 * height) - (5 * age) + 5 : (10 * weight) + (6.25 * height) - (5 * age) - 161);
                 const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
                 const tdee = Math.round(bmr * multipliers[data.activityLevel]);
-                
-                // 목표 계산
                 const lossNeeded = weight - parseFloat(data.targetWeight);
-                const totalDeficit = lossNeeded * 7700; // 1kg = 7700kcal
+                const totalDeficit = lossNeeded * 7700;
                 const days = data.durationWeeks * 7;
                 const dailyDeficit = Math.round(totalDeficit / days);
-                
-                // 최종 데이터 (임시 저장용)
-                const fullProfile = {
-                    ...data,
-                    tdee,
-                    dailyDietGoal: Math.max(tdee - 300 - (dailyDeficit * 0.7), 1200), // 최소 1200 유지
-                    weeklyWorkoutGoal: Math.round((dailyDeficit * 0.3) * 7),
-                    createdAt: new Date().toISOString()
-                };
-
-                setTempProfile(fullProfile);
-                setViewState('analyzing'); // 분석 화면으로 전환
+                const fullProfile = { ...data, tdee, dailyDietGoal: Math.max(tdee - 300 - (dailyDeficit * 0.7), 1200), weeklyWorkoutGoal: Math.round((dailyDeficit * 0.3) * 7), createdAt: new Date().toISOString() };
+                setTempProfile(fullProfile); setViewState('analyzing');
             };
 
-            const handleLogout = async () => {
-                await signOut(auth);
-                setProfile(null);
-                setViewState('intro');
-            };
+            const handleLogout = async () => { await signOut(auth); setProfile(null); setViewState('intro'); };
 
-            // 렌더링 분기
             if (loading) return <div className="h-screen flex items-center justify-center text-gray-500">로딩 중...</div>;
-
             if (viewState === 'intro') return <IntroView onStart={() => setViewState('onboarding')} onLoginRequest={() => setViewState('login')} />;
             if (viewState === 'onboarding') return <OnboardingPage onComplete={handleOnboardingFinish} />;
             if (viewState === 'analyzing') return <LoadingView onFinish={() => setViewState('login')} />;
             if (viewState === 'login') return <LoginPage onLogin={handleGoogleLogin} error={loginError} planData={tempProfile} />;
 
-            // Main App View (Authenticated)
             return (
                 <div className="bg-gray-100 h-screen w-full flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden font-sans relative">
-                    <header className="bg-white px-4 py-3 border-b flex justify-between items-center z-10">
-                        <h1 className="text-lg font-bold text-gray-800 flex items-center">
-                            <Icon name="activity" className="text-blue-600 mr-2" /> Fit Me 
-                            <span className="ml-2 text-xs text-gray-400 font-normal">| {profile?.nickname}님</span>
-                        </h1>
-                        <button onClick={handleLogout} className="text-xs text-gray-400 underline">로그아웃</button>
-                    </header>
-                    
+                    <header className="bg-white px-4 py-3 border-b flex justify-between items-center z-10"><h1 className="text-lg font-bold text-gray-800 flex items-center"><Icon name="activity" className="text-blue-600 mr-2" /> Fit Me <span className="ml-2 text-xs text-gray-400 font-normal">| {profile?.nickname}님</span></h1><button onClick={handleLogout} className="text-xs text-gray-400 underline">로그아웃</button></header>
                     <main className="flex-1 overflow-hidden p-4 relative bg-gray-50">
-                        {/* 탭 내용 (지면상 간단한 플레이스홀더로 대체하지만 기존 기능 연결 가능) */}
-                        {activeTab === 'calendar' && (
-                            <div className="h-full flex flex-col items-center justify-center text-center">
-                                <p className="text-gray-400 mb-4">메인 대시보드 (Calendar View)</p>
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border w-full">
-                                    <h3 className="font-bold mb-2">오늘의 목표</h3>
-                                    <ProgressRing radius={60} stroke={10} progress={0} max={profile?.dailyDietGoal || 2000} label="0" subLabel="kcal 섭취" />
-                                </div>
-                            </div>
-                        )}
-                        {activeTab === 'record' && <div className="h-full flex items-center justify-center text-gray-400">기록 화면</div>}
-                        {activeTab === 'stats' && <div className="h-full flex items-center justify-center text-gray-400">통계 화면</div>}
+                        {activeTab === 'calendar' && <CalendarView logs={logs} selectedDate={selectedDate} setSelectedDate={setSelectedDate} profile={profile} />}
                         {activeTab === 'my' && (
                             <div className="p-4">
                                 <h2 className="text-xl font-bold mb-4">내 정보</h2>
                                 <div className="bg-white p-4 rounded-xl shadow-sm mb-4">
-                                    <p>현재 체중: {profile?.weight}kg</p>
-                                    <p>목표 체중: {profile?.targetWeight}kg</p>
-                                    <p>목표 기간: {profile?.durationWeeks}주</p>
+                                    <p className="mb-2">현재 체중: <span className="font-bold">{profile?.weight}kg</span></p>
+                                    <p className="mb-2">목표 체중: <span className="font-bold">{profile?.targetWeight || '미설정'}kg</span></p>
+                                    <p>목표 기간: <span className="font-bold">{profile?.durationWeeks || '-'}주</span></p>
                                 </div>
+                                <AICoachView logs={logs} apiKey={apiKey} profile={profile} />
                             </div>
                         )}
+                        {activeTab === 'record' && <div className="h-full flex items-center justify-center text-gray-400">기록 화면 (준비중)</div>}
+                        {activeTab === 'stats' && <div className="h-full flex items-center justify-center text-gray-400">통계 화면 (준비중)</div>}
                     </main>
-
                     <nav className="bg-white border-t flex justify-around items-center h-16 pb-safe z-20 pt-3">
                         <button onClick={() => setActiveTab('calendar')} className={`flex flex-col items-center w-full h-full ${activeTab === 'calendar' ? 'text-blue-600' : 'text-gray-400'}`}><Icon name="home" /><span className="text-xs">Home</span></button>
                         <button onClick={() => setActiveTab('record')} className={`flex flex-col items-center w-full h-full ${activeTab === 'record' ? 'text-blue-600' : 'text-gray-400'}`}><Icon name="plus" /><span className="text-xs">기록</span></button>

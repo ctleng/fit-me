@@ -323,7 +323,7 @@
             const [dietForm, setDietForm] = useState({ id: null, mealTime: 'lunch', menu: '', kcal: '', photo: null, items: [] });
             const [bodyForm, setBodyForm] = useState({ weight: '', muscle: '', fat: '', sugar: '' });
             const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
-            const { doc, setDoc, db, appId } = window.firebaseApp;
+            const { doc, setDoc } = window.firebaseApp;
 
             useEffect(() => { 
                 const logBody = logs[selectedDate]?.body;

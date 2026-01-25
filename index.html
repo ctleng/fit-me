@@ -240,15 +240,14 @@
             const [period, setPeriod] = useState('week');
             // 1. 기준일 설정
             const now = new Date();
-            // 2. 이번주 월요일 찾기
-            const currentDay = now.getDay(); // 0(일) ~ 6(토)
-            const distanceToMonday = (currentDay + 6) % 7; // 월요일부터 얼마나 떨어져 있는지 계산
-            const monday = new Date(now);
-            monday.setDate(now.getDate() - distanceToMonday); // 이번 주 월요일 날짜 확정
-            // 3. 월요일부터 7일 생성
+            // 2. 일요일부터 한주가 시작함
+             const currentDay = now.getDay(); // 0(일) ~ 6(토)
+            const sunday = new Date(now);
+            sunday.setDate(now.getDate() - currentDay); // 오늘 요일만큼 빼면 바로 일요일이 됩니다!
+            // 3. 일요일부터 7일 생성
             const last7Days = Array.from({ length: 7 }, (_, i) => { 
-                const date = new Date(monday);
-                date.setDate(monday.getDate() + i); // 0일, 1일, 2일... 더해서 월~일 생성
+                const date = new Date(sunday);
+                date.setDate(sunday.getDate() + i); // 0일, 1일, 2일... 더해서 일~토 생성
                 const dateStr = date.toISOString().split('T')[0]; const dayLog = logs[dateStr]; return { date: dateStr, dateLabel: `${date.getMonth()+1}/${date.getDate()}`, intake: dayLog?.diet?.reduce((sum, item) => sum + (parseFloat(item.kcal) || 0), 0) || 0, burned: dayLog?.exercises?.reduce((sum, ex) => sum + (ex.kcal || 0), 0) || 0, goal: profile?.dailyDietGoal || 2000 }; });
             // last7Days 배열을 돌면서 burned(소모 칼로리)만 쏙쏙 뽑아 합칩니다.
             const totalKcal = last7Days.reduce((sum, day) => sum + day.burned, 0);
